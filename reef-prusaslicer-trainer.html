@@ -1,0 +1,1511 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REEF PrusaSlicer Trainer</title>
+<style>
+/* Same layout family as the REEF CNC Milling Trainer and Nametag Maker: brand bar, tab row, visual stage (left, sticky) beside a control rail (right). */
+:root{
+  --red:#B71F34; --yellow:#FCC424; --blue:#05A7E0; --aqua:#7DCFD8; --ink:#010101; --reef-dark:#231F20; --orange:#F15B29; --gray:#424143;
+  --bg:#F2F4F5; --surface:#FFFFFF; --fg:#151314; --muted:#5A5F63; --line:#D5DADD; --sel:#010101; --sel-fg:#FFFFFF;
+  --stage:#E4E9EB; --focus:#05A7E0;
+  --f-display:"Arial Black","Arial Bold",Arial,Helvetica,sans-serif;
+  --f-body:"Post Grotesk",Arial,Helvetica,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --lvl:#5DBB46;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161415; --surface:#231F20; --fg:#F1F0F0; --muted:#A9A5A6; --line:#3A3536; --sel:#FFFFFF; --sel-fg:#010101;
+  --stage:#2C2829; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#161415; --surface:#231F20; --fg:#F1F0F0; --muted:#A9A5A6; --line:#3A3536; --sel:#FFFFFF; --sel-fg:#010101;
+  --stage:#2C2829; color-scheme:dark;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);margin:0}
+body{color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar{background:var(--reef-dark);color:#fff;position:relative;z-index:30}
+.bar .in{max-width:1240px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.brand img{height:48px;width:auto;display:block}
+.brand span{font-size:14px;opacity:.85;font-weight:700}
+.barR{display:flex;align-items:center;gap:18px;margin-left:auto}
+.dashes{display:flex;gap:4px}
+.dashes i{display:block;width:22px;height:5px}
+.mode{position:relative}
+.mode>button{font:inherit;font-size:14px;background:#010101;color:#fff;border:1px solid #5A5556;border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.mode>button:hover{border-color:#fff}
+.mode>button .chev{width:12px;height:12px;opacity:.8}
+.mode ul{position:absolute;right:0;top:calc(100% + 6px);margin:0;padding:4px 0;list-style:none;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 28px rgba(0,0,0,.25);min-width:240px}
+.mode li button{font:inherit;font-size:14px;width:100%;background:none;border:0;color:inherit;display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;text-align:left}
+.mode li+li{border-top:1px solid var(--line)}
+.mode li button:hover,.mode li button[aria-checked="true"]{background:var(--bg)}
+.mode li small{display:block;color:var(--muted);font-size:12px}
+.tabsrow{max-width:1240px;margin:0 auto;padding-top:22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+main{max-width:1240px;margin:0 auto;padding-block:14px 40px;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:880px){main{grid-template-columns:minmax(0,1fr)}}
+.stagewrap{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px;min-width:0}
+@media (max-width:880px){.stagewrap{position:static}}
+.stage{background:var(--stage);border-radius:6px;padding:18px;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:10px;min-height:320px}
+.stage svg{width:100%;height:auto;max-height:62vh;display:block}
+.stage h3{margin:0;font-family:var(--f-display);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:18px;height:0;border-top:2px solid;display:inline-block}
+.sw.fill{height:10px;border:0}
+.panel{display:flex;flex-direction:column;gap:18px;min-width:0}
+section.grp{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.lbl{font-family:var(--f-display);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0;display:flex;align-items:center;gap:8px}
+.lbl::before{content:"";width:10px;height:10px;background:var(--c,var(--red))}
+.sub{font-size:13px;color:var(--muted)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:7px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.seg button[aria-pressed="true"]{background:var(--sel);color:var(--sel-fg);border-color:var(--sel)}
+.seg button:hover{border-color:var(--fg)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.seg.big button{font-size:15px;font-weight:700;padding:10px 16px;background:var(--surface)}
+.seg.big button[aria-pressed="true"]{background:var(--sel)}
+.slide{display:grid;grid-template-columns:120px minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:13px}
+.slide span{color:var(--muted)}
+.slide output{font-family:var(--f-mono);font-size:13px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--red)}
+input:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.chk{display:inline-flex;align-items:flex-start;gap:9px;color:var(--fg);font-size:14px;cursor:pointer;line-height:1.35}
+.chk input{width:18px;height:18px;accent-color:var(--red);margin:0;flex:none}
+.btn{font:inherit;font-weight:700;border-radius:4px;padding:9px 14px;cursor:pointer;border:1px solid transparent}
+.btn.pri{background:var(--yellow);color:#010101}
+.btn.sec{background:transparent;color:var(--fg);border-color:var(--fg)}
+.note{font-size:13px;color:var(--muted);margin:0}
+.warn{background:var(--yellow);color:#010101;border-radius:4px;padding:8px 10px;font-size:13px;margin:0}
+.ok{background:var(--aqua);color:#010101;border-radius:4px;padding:8px 10px;font-size:13px;margin:0}
+.bad{background:var(--red);color:#fff;border-radius:4px;padding:8px 10px;font-size:13px;margin:0}
+.dims{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+table.cmp{width:100%;border-collapse:collapse;font-size:13px}
+table.cmp th,table.cmp td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.cmp th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+table.cmp td:first-child{font-weight:700;white-space:nowrap}
+kbd{font-family:var(--f-mono);font-size:12px;background:var(--bg);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.card span{font-size:12px;color:var(--muted)}
+.card b{font-family:var(--f-mono);font-size:19px;font-variant-numeric:tabular-nums}
+.card small{font-size:12px;color:var(--muted)}
+.card:hover{border-color:var(--fg)}
+.verdict{border-radius:6px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
+.verdict .vt{font-family:var(--f-display);font-size:13px;letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:2px}
+.verdict.g{background:var(--aqua);color:#010101}.verdict.y{background:var(--yellow);color:#010101}.verdict.r{background:var(--red);color:#fff}
+.verdict .ic{font-size:22px;line-height:1;flex:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer}
+.chip:hover{border-color:var(--fg)}
+ul.plain{margin:0;padding-left:18px;font-size:14px}
+ul.plain li{margin:3px 0}
+.checks{display:flex;flex-direction:column;gap:10px}
+.prog{height:8px;background:var(--bg);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--red);width:0;transition:width .2s}
+[data-info]{cursor:help}
+.term{border-bottom:1px dotted var(--muted)}
+svg [data-info]{transition:filter .12s}
+svg .hl{filter:drop-shadow(0 0 4px #FCC424) drop-shadow(0 0 2px #FCC424)}
+svg [data-info]:hover,svg [data-info].on{filter:drop-shadow(0 0 3px #05A7E0) drop-shadow(0 0 1px #05A7E0)}
+svg text{font-family:var(--f-body)}
+.tip{position:fixed;z-index:60;max-width:340px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-left:5px solid var(--lvl);border-radius:6px;padding:10px 12px;box-shadow:0 10px 28px rgba(0,0,0,.22);pointer-events:none;font-size:13px;line-height:1.4}
+.tip h4,#infoCard h4{margin:0 0 4px;font-family:var(--f-display);font-size:12px;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tip p,#infoCard p{margin:5px 0}
+.tag{font-family:var(--f-body);font-size:11px;letter-spacing:0;text-transform:none;padding:1px 6px;border-radius:3px;background:var(--fg);color:var(--bg)}
+p.now{font-family:var(--f-mono);font-size:12px;background:var(--bg);padding:5px 7px;border-radius:4px}
+p.more{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
+#infoCard{font-size:14px;min-height:5em}
+#infoCard .empty{color:var(--muted);margin:0}
+@media (max-width:480px){.slide{grid-template-columns:90px minmax(0,1fr) 56px}}
+@media (prefers-reduced-motion:reduce){svg [data-info]{transition:none}}
+figure.ph{margin:10px 0 0}
+figure.ph img{display:block;width:100%;max-height:280px;object-fit:contain;border-radius:4px;cursor:zoom-in;background:var(--bg)}
+figure.ph figcaption{font-size:11px;color:var(--muted);margin-top:4px}
+p.lnk{margin:8px 0 0;font-size:13px}p.lnk a{color:var(--fg);font-weight:700}
+p.pinned{font-size:11px;color:var(--muted);margin:8px 0 0}
+.lb{position:fixed;inset:0;z-index:80;background:rgba(1,1,1,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;cursor:zoom-out}
+.lb img{max-width:94vw;max-height:84vh;border-radius:6px}
+.lb .btn{color:#fff;border-color:#fff}
+.staffbar{background:var(--yellow);color:#010101}
+.staffbar .in{max-width:1240px;margin:0 auto;padding:10px 0;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px}
+.staffbar .chip{background:#fff;color:#010101;border-color:#010101}
+.staffbar .btn.pri{background:#010101;color:#fff}
+.staffc{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.staffc .sub{width:100%}
+/* Stella, the guide (shared mascot across REEF tools) */
+#stella{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:58;font-size:14px}
+.stella-btn{position:relative;display:block;margin-left:auto;width:84px;height:84px;padding:0;border:0;background:none;cursor:pointer}
+.stella-btn:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:50%}
+.star{display:block;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));transform-origin:50% 70%}
+.star.mini{filter:none}
+.star .lid{transform-box:fill-box;transform-origin:50% 0;transform:scaleY(0);transition:transform .5s ease}
+.star .yawn{opacity:0;transform-box:fill-box;transform-origin:50% 0}
+.star .smile{transition:opacity .3s}
+.star.bored .lid{transform:scaleY(1)}
+.star.bored .smile{opacity:0}
+.star.bored .yawn{opacity:1}
+@media (prefers-reduced-motion:no-preference){
+.star.idle{animation:bob 3.5s ease-in-out infinite}
+.star.wiggle{animation:wig .9s ease-in-out 2}
+.star.jump{transform-origin:50% 54%;animation:jump 1s cubic-bezier(.3,.7,.4,1)}
+.star.bored{animation:droop 4s ease-in-out infinite}
+.star.bored .yawn{animation:yawn 3.2s ease-in-out infinite}
+#stella.bored .zzz i{animation:rise 3s ease-in infinite}
+#stella.bored .zzz i:nth-child(2){animation-delay:1s}
+#stella.bored .zzz i:nth-child(3){animation-delay:2s}
+#stella.bored .zzz b{animation:rise 3.4s ease-in-out infinite .5s}
+#stella.bored .zzz b:nth-of-type(2){animation-delay:2.2s}}
+@keyframes bob{50%{transform:translateY(-4px) rotate(-3deg)}}
+@keyframes wig{25%{transform:rotate(-10deg) translateY(-6px)}75%{transform:rotate(10deg) translateY(-6px)}}
+@keyframes jump{0%{transform:translateY(0) rotate(0) scale(1,1)}14%{transform:translateY(0) rotate(0) scale(1.12,.84)}50%{transform:translateY(-70px) rotate(200deg) scale(.96,1.04)}82%{transform:translateY(0) rotate(360deg) scale(1.1,.88)}100%{transform:translateY(0) rotate(360deg) scale(1,1)}}
+@keyframes droop{0%,100%{transform:rotate(-7deg) translateY(3px)}50%{transform:rotate(5deg) translateY(5px)}}
+@keyframes yawn{0%,100%{transform:scaleY(.35)}35%,60%{transform:scaleY(1.15)}}
+@keyframes rise{0%{transform:translate(0,0);opacity:0}15%{opacity:1}100%{transform:translate(-8px,-56px);opacity:0}}
+.zzz{position:absolute;right:54px;top:-6px;width:40px;height:60px;pointer-events:none;opacity:0;transition:opacity .4s}
+#stella.bored .zzz{opacity:1}
+.zzz i{position:absolute;bottom:0;border:2px solid var(--aqua);border-radius:50%;opacity:0}
+.zzz i:nth-child(1){width:10px;height:10px;left:18px}.zzz i:nth-child(2){width:7px;height:7px;left:6px}.zzz i:nth-child(3){width:12px;height:12px;left:26px}
+.zzz b{position:absolute;bottom:0;font-family:var(--f-display);color:var(--blue);opacity:0}
+.zzz b:nth-of-type(1){left:4px;font-size:13px}.zzz b:nth-of-type(2){left:22px;font-size:17px}
+.hello{position:absolute;right:92px;bottom:20px;width:max-content;max-width:min(260px,calc(100vw - 120px));background:var(--yellow);color:#010101;border-radius:16px 16px 4px 16px;padding:10px 14px;box-shadow:0 8px 22px rgba(0,0,0,.2);font-weight:700;line-height:1.35}
+.hello .row{margin-top:8px;gap:6px}
+.hello button{font:inherit;font-size:13px;font-weight:700;border-radius:999px;padding:5px 12px;cursor:pointer;border:1px solid #010101;background:#010101;color:#fff}
+.hello button+button{background:transparent;color:#010101}
+.spanel{position:absolute;right:0;bottom:96px;width:min(360px,calc(100vw - 32px));max-height:min(72vh,580px);display:flex;flex-direction:column;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 36px rgba(0,0,0,.28);overflow:hidden}
+.shead{display:flex;align-items:center;gap:8px;background:var(--reef-dark);color:#fff;padding:8px 10px}
+.shead span{font-size:12px;opacity:.8}
+.shead button{background:none;border:0;color:#fff;font-size:22px;line-height:1;cursor:pointer;padding:2px 6px}
+.shead .sreset{margin-left:auto;font:inherit;font-size:12px;font-weight:700;color:#fff;background:transparent;border:1px solid #6A6566;border-radius:999px;padding:3px 10px;cursor:pointer}
+.shead .sreset:hover{border-color:#fff}
+.shead .sreset+button{margin-left:4px}
+.msgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+.msg{max-width:88%;padding:8px 11px;line-height:1.4}
+.msg.s{align-self:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:12px 12px 12px 3px}
+.msg.u{align-self:flex-end;background:var(--fg);color:var(--bg);border-radius:12px 12px 3px 12px}
+.msg ol,.msg ul{margin:6px 0 0;padding-left:18px}.msg p{margin:0 0 6px}
+.opts{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-top:1px solid var(--line)}
+.opts .chip{font-size:13px}
+.opts .chip.go{background:var(--yellow);color:#010101;border-color:var(--yellow);font-weight:700}
+.pulse{animation:hpulse .9s ease-in-out infinite alternate;border-radius:6px}
+@keyframes hpulse{from{box-shadow:0 0 0 2px #FCC424}to{box-shadow:0 0 0 7px rgba(252,196,36,.45)}}
+svg .pulse{animation:spulse .9s ease-in-out infinite alternate}
+@keyframes spulse{from{filter:drop-shadow(0 0 2px #FCC424)}to{filter:drop-shadow(0 0 9px #FCC424) drop-shadow(0 0 3px #B71F34)}}
+@media (prefers-reduced-motion:reduce){.pulse,svg .pulse{animation:none;box-shadow:0 0 0 4px #FCC424}}
+.spanel.dockL{position:fixed;right:auto;left:max(16px,env(safe-area-inset-left,0px));bottom:16px}
+.spot-ring{position:fixed;z-index:57;pointer-events:none;border:4px solid #FCC424;border-radius:10px;box-shadow:0 0 0 2px #010101,0 0 22px 6px rgba(252,196,36,.75)}
+.spot-tag{position:absolute;left:50%;top:-34px;transform:translateX(-50%);background:#FCC424;color:#010101;font-weight:700;font-size:13px;padding:3px 10px;border-radius:999px;box-shadow:0 0 0 2px #010101;white-space:nowrap}
+.spot-ring.below .spot-tag{top:auto;bottom:-34px}
+@media (prefers-reduced-motion:no-preference){.spot-ring{animation:ringp .9s ease-in-out infinite alternate}}
+@keyframes ringp{from{box-shadow:0 0 0 2px #010101,0 0 8px 2px rgba(252,196,36,.5)}to{box-shadow:0 0 0 2px #010101,0 0 26px 10px rgba(252,196,36,.85)}}
+@media print{#stella,.tip,.spot-ring{display:none!important}}
+/* level gating */
+body[data-mode="1"] [data-min="2"],body[data-mode="1"] [data-min="3"],body[data-mode="2"] [data-min="3"]{display:none!important}
+</style></head><body data-mode="1">
+
+<header class="bar gut">
+  <div class="in">
+    <div class="brand"><img src="data:image/png;base64,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" width="167" height="96" alt="REEF"><span>Makerspace · PrusaSlicer Trainer · Prusa MK4S · PLA · 0.4 mm nozzle</span></div>
+    <div class="barR">
+      <div class="mode" id="mode">
+        <button type="button" id="modeBtn" aria-haspopup="true" aria-expanded="false"></button>
+        <ul id="modeMenu" role="menu" hidden></ul>
+      </div>
+      <div class="dashes" aria-hidden="true"><i style="background:var(--red)"></i><i style="background:var(--yellow)"></i><i style="background:var(--blue)"></i><i style="background:var(--aqua)"></i></div>
+    </div>
+  </div>
+</header>
+
+<div class="tabsrow gut">
+  <div class="seg big" id="tabSeg" role="tablist" aria-label="Sections">
+    <button type="button" data-v="ui" aria-pressed="true">PrusaSlicer basics</button>
+    <button type="button" data-v="orient" aria-pressed="false">Bed contact</button>
+    <button type="button" data-v="infill" aria-pressed="false">Infill</button>
+    <button type="button" data-v="brim" aria-pressed="false">Brim</button>
+    <button type="button" data-v="sup" aria-pressed="false">Supports</button>
+    <button type="button" data-v="export" aria-pressed="false">Slice &amp; export</button>
+    <button type="button" data-v="printer" aria-pressed="false">At the printer</button>
+  </div>
+  <span class="dims" id="hint">Hover anything highlighted to learn about it · tap on touch screens</span>
+</div>
+
+<div id="staffBar" class="staffbar gut" hidden></div>
+<main class="gut">
+  <div class="stagewrap">
+    <div class="stage" id="stage"><p class="note">Starting… If this message stays, open this file in Chrome, Edge, or Safari.</p></div>
+    <div class="legend" id="legend"></div>
+    <section class="grp" style="--c:var(--blue)">
+      <h2 class="lbl">Info</h2>
+      <div id="infoCard" aria-live="polite"><p class="empty">Hover over part of the picture to see what it is and why it matters.</p></div>
+    </section>
+  </div>
+  <div class="panel" id="rail"></div>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script type="application/json" id="photoData">{}</script>
+<script>
+/* ================= EDITABLE DATA =================
+   REEF prints PLA only on Original Prusa MK4S printers with 0.4 mm nozzles.
+   Staff can tune the bed-contact rules, preset names and checklist text here. */
+var REEF = {
+  printer: `Original Prusa MK4S 0.4 nozzle`,
+  printerShort: `Original Prusa MK4S 0.4 nozzle`,
+  filament: `Prusament PLA`,
+  print: `0.20mm STRUCTURAL`,
+  bed: [250, 210, 220],            // MK4S build volume, mm (X × Y × Z)
+  // Bed-contact rules used by the checker (mm² and height ÷ √area).
+  minArea: 100,      // below this, nothing (not even a brim) makes the part stable → re-orient or cut a flat
+  okArea: 400,       // below this, add a brim
+  maxRatio: 3,       // height ÷ √(contact area) above this → add a brim
+  badRatio: 6,       // above this → re-orient
+  brimDefault: 5,    // mm — what the Brim checkbox gives you on the Plater
+  guide: `https://docs.google.com/document/d/11KRLgB3oxGVbnMrQfPn-FflmLpzjRqdsiOV-NNF3xHY/edit?usp=drive_link`  // REEF FDM 3D Printing Guide (MK4S)
+};
+var MODES = [null,
+  { n: `Beginner`, c: `#5DBB46`, d: `Like PrusaSlicer’s Beginner mode — essentials only` },
+  { n: `Intermediate`, c: `#FCC424`, d: `Like Normal mode — more settings and terms` },
+  { n: `Expert`, c: `#B71F34`, d: `Like “Expert” — everything, with the why` }];
+
+/* ================= HOVER INFO =================
+   t = title, tag = small badge, b = Beginner text, i = added at Intermediate, e = added at Expert */
+var I = {
+  // ---------- PrusaSlicer window ----------
+  ui_top: { t: `Tab bar`, b: `<b>Plater</b> is where you work. Print Settings, Filaments and Printers hold every setting — you rarely need them, because the right-hand panel covers the basics.`,
+    i: `Printables lets you browse models from printables.com inside PrusaSlicer. The search box finds any setting by name.`,
+    e: `Settings you change show an orange “unlocked” icon; click it to go back to the system value. A changed preset shows “(modified)”. <b>Don’t save changes or new profiles on the shared REEF computers</b> without asking staff.` },
+  ui_mode: { t: `Mode switch`, tag: `Beginner · Normal · Expert`, b: `PrusaSlicer hides settings until you need them. <b>Beginner mode</b> is all you need for most REEF prints.`,
+    i: `Normal mode shows more settings (perimeters, infill pattern, support style) and more tools (Cut, Paint-on supports, Seam painting). Expert shows everything.`, e: `Green / yellow / red dots next to each setting tell you which mode it lives in — the same colours as this trainer’s levels.` },
+  ui_tb: { t: `Top toolbar`, b: `<b>Add</b> a model (first icon), delete, delete all, <b>Arrange</b> (<kbd>A</kbd>), copy/paste, add more copies, and undo/redo.`,
+    i: `Arrange spaces everything out on the bed automatically. Add instance makes another copy that shares the same settings.`,
+    e: `Variable layer height lets you print fine layers only where curves need them. Split to objects separates a model that came as one file.` },
+  ui_gz: { t: `Left toolbar (tools)`, b: `Appears when a model is selected. In Beginner mode: Move <kbd>M</kbd>, Scale <kbd>S</kbd>, Rotate <kbd>R</kbd>, <b>Place on face</b> <kbd>F</kbd>, and Measure.`,
+    i: `<b>Place on face</b> is the most useful tool: click it, then click the flat face you want touching the bed. Big flat face down = a print that stays put.`,
+    e: `Normal and Expert modes add Cut <kbd>C</kbd>, Paint-on supports <kbd>L</kbd> and Seam painting <kbd>P</kbd>. Cut can slice a round or awkward part into pieces that each have a flat face.` },
+  ui_views: { t: `3D view / Preview`, tag: `Tab`, b: `Bottom-left buttons: the <b>cube</b> is the 3D view where you arrange parts; the <b>layers</b> icon is <b>Preview</b>, where you check the sliced layers.`, i: `Slice now switches to Preview automatically. <kbd>Tab</kbd> also toggles between them.` },
+  ui_bed: { t: `Print bed`, tag: `250 × 210 × 220 mm`, b: `The MK4S bed. Your model must sit <b>on</b> it and fit inside the outline.`,
+    i: `A model outside the outline turns blue/red and won’t slice. Keep parts away from the very edges.`, e: `The MK4S probes the bed with its load-cell nozzle before every print, so the first layer is consistent — if the part has enough contact.` },
+  ui_part: { t: `Your model`, b: `Click to select. The face touching the bed is where the print starts.`,
+    i: `Drag to move. Right-click for options like scale, add instance, or per-object settings.`, e: `Per-object settings let one part on the plate have more infill or a brim without changing the others.` },
+  ui_printer: { t: `Printer preset`, tag: `pick first`, b: `Choose <b>${REEF.printer}</b>. Every REEF printer is an MK4S.`,
+    i: `Files sliced for a different printer (MK4, MK3S, MINI…) will warn or refuse on the MK4S. Always check this first.`, e: `On your own computer: Configuration → Configuration Assistant → Prusa Research → tick the <b>0.4 mm nozzle</b> under MK4S, and select only <b>Prusament PLA</b> on the Filaments page. REEF computers are already set up.` },
+  ui_fil: { t: `Filament preset`, b: `Choose <b>${REEF.filament}</b>. REEF prints in PLA only.`,
+    i: `Sets nozzle and bed temperatures (PLA ≈ 215 °C nozzle / 60 °C bed) and cooling.`, e: `REEF uses PLA only (it’s safer to print indoors). <b>Please don’t add other material profiles to the REEF computers.</b>` },
+  ui_print: { t: `Print settings preset`, b: `Use <b>${REEF.print}</b> — the REEF default: good quality, good speed, most reliable.`,
+    i: `The number is the layer height. <b>0.15mm DETAIL</b>: fine detail, slow. <b>0.30mm SPEED</b>: very fast, coarser. The REEF computers have these profiles ready.`,
+    e: `With a 0.4 mm nozzle, layer heights from 0.07 to 0.30 mm are available. Thinner layers mostly improve curved tops and slopes, not vertical walls.` },
+  ui_sup: { t: `Supports`, b: `None · Support on build plate only · For support enforcers only · Everywhere. See the <b>Supports</b> tab.`,
+    i: `“Build plate only” is the safest choice when you need supports: they never start on top of your model, so they’re easier to remove.` },
+  ui_inf: { t: `Infill`, b: `How full the inside of the part is. 10% for looks, 15–20% for most parts, 30% for lots of force. See the <b>Infill</b> tab.`,
+    i: `This drop-down sets density only; the pattern is in Print Settings → Infill (Normal mode).` },
+  ui_brim: { t: `Brim checkbox`, b: `Adds a thin flat ring around the bottom of your part so it grips the bed. See the <b>Brim</b> tab.`,
+    i: `Turn it on for small footprints, tall/skinny parts and sharp corners. Peels off after printing.` },
+  ui_list: { t: `Object list`, b: `Every model on the bed, by name. Select, rename, or delete here.`,
+    i: `Right-click an object to add per-object settings, modifiers or support enforcers/blockers.`, e: `Instances (copies) appear indented under their object.` },
+  ui_slice: { t: `Slice now`, tag: `Ctrl + R`, b: `Turns your 3D model into layers and toolpaths. Then check <b>Preview</b>.`,
+    i: `Fix any warning before exporting. The most common is <b>“Low bed adhesion”</b> — tick <b>Brim</b> and slice again.` },
+  ui_export: { t: `Export G-code`, tag: `Ctrl + G`, b: `Saves the sliced file the printer reads. Give it a name you’ll recognise.`,
+    i: `MK4S files save as <b>.bgcode</b> (binary G-code): smaller, with a preview picture on the printer screen.`, e: `At REEF, files go to the printer on a USB drive. Ignore “Send to printer” — the printers aren’t networked.` },
+  ui_info: { t: `Sliced info`, b: `Shows print time and how much filament it uses.`,
+    i: `REEF caps print jobs at <b>20 hours</b>. Long times usually mean the model is too big, too dense, or scaled wrong.` },
+  ui_view: { t: `Camera`, b: `Rotate with left-drag, pan with right-drag, zoom with the wheel.`,
+    i: `<kbd>0</kbd> iso view, <kbd>1</kbd> top, <kbd>2</kbd> bottom, <kbd>3</kbd>–<kbd>6</kbd> front/back/left/right. <kbd>Z</kbd> zooms to your model. Use <kbd>2</kbd> (bottom) to see what touches the bed!` },
+  // ---------- Preview ----------
+  pv_vs: { t: `Layer slider`, b: `Drag down to see inside the print, layer by layer.`,
+    i: `Always drag it to the <b>first layer</b> and look: how much of your part touches the bed? That tiny patch is all that holds the print.`,
+    e: `Right-click the + on the slider to add a colour change or pause at that layer.` },
+  pv_hs: { t: `Move slider`, b: `Plays the nozzle path within one layer.`, i: `Useful to see the order things print in.` },
+  pv_legend: { t: `Legend`, b: `Colours show what each line is: walls, infill, support, brim…`,
+    i: `Switch “View” to Feature type (default), Height, Speed, or Fan to check different things.` },
+  pv_first: { t: `First layer`, b: `The bottom layer, squished onto the bed. If it’s small, the print can break loose — PrusaSlicer may warn “Low bed adhesion”.`,
+    i: `Check it in Preview before every export.` },
+  pv_brim: { t: `Brim (in preview)`, b: `The brim shows as a ring of lines around the first layer.` },
+  pv_sup: { t: `Support (in preview)`, b: `Supports show in green. Make sure they start on the bed and reach every hanging part.` },
+  pv_inf: { t: `Infill (in preview)`, b: `The inside pattern, in red. Hidden by the top layers when finished.` },
+  pv_per: { t: `Perimeters (in preview)`, b: `The walls, in orange. Most of a part’s strength is in its walls.` },
+  // ---------- Bed contact ----------
+  or_contact: { t: `Contact patch`, b: `The part of your model that touches the bed. It is the <b>only</b> thing holding the whole print in place.`,
+    i: `Too small, and the nozzle can knock the part over or drag it loose part-way through.`,
+    e: `What happens next: the printer keeps extruding into thin air → “spaghetti” → plastic wraps the nozzle and heater block → a clog, and sometimes a ruined hotend.` },
+  or_part: { t: `Part (side view)`, b: `How your part sits on the bed. Tall and skinny = wobbly; low and wide = stable.` },
+  or_bed: { t: `Print bed`, b: `Steel sheet. PLA sticks well when the sheet is clean — don’t touch the print surface with your fingers.` },
+  or_top: { t: `Footprint (from below)`, b: `What the first layer looks like from underneath. Bigger = better grip.`,
+    i: `In PrusaSlicer press <kbd>2</kbd> for the bottom view, or check layer 1 in Preview.` },
+  or_brim: { t: `Brim`, b: `Extra lines around the first layer that make the footprint bigger.`, i: `A brim helps a small footprint — it can’t fix an almost-zero one (like a ball sitting on a point).` },
+  or_sup: { t: `Supports needed`, b: `Hatched areas hang in the air and need supports in this orientation.`, i: `A better orientation often removes supports entirely.` },
+  or_h: { t: `Height`, b: `Taller parts wobble more as the nozzle moves back and forth at the top.` },
+  // ---------- Infill ----------
+  in_per: { t: `Perimeters (walls)`, b: `The outside walls of the part. Most strength comes from here.`,
+    i: `Default is 2. For strong parts, 3–4 walls helps more than adding infill.`, e: `Each 0.45 mm-wide wall adds stiffness right where bending stress is highest — at the surface.` },
+  in_inf: { t: `Sparse infill`, b: `The pattern inside your part. It supports the top layers and adds some strength.`,
+    i: `More infill = heavier, slower, uses more filament, and only somewhat stronger.` },
+  in_top: { t: `Top solid layers`, b: `Solid layers that close off the top. They need infill underneath to bridge onto.`,
+    i: `Very low infill (under ~10%) can show “pillowing” — bumpy top surfaces.` },
+  in_bot: { t: `Bottom solid layers`, b: `Solid layers on the bed. These form your first layer.` },
+  pat_grid: { t: `Grid`, b: `Criss-cross lines on every layer. Fast and simple.`, i: `Lines cross on each layer, so the nozzle passes over its own lines — fine with PLA.` },
+  pat_gyroid: { t: `Gyroid`, b: `Wavy pattern, strong in every direction. A great all-rounder.`, i: `Slightly slower to print than grid, but very even strength.` },
+  pat_rect: { t: `Rectilinear`, b: `Parallel lines that switch direction every layer. Light and quick.` },
+  pat_cubic: { t: `Cubic`, b: `Stacked tilted cubes — good 3D strength without crossing lines.` },
+  pat_honey: { t: `Honeycomb`, b: `Hexagons. Strong but slow to print.` },
+  pat_light: { t: `Lightning`, b: `Only builds thin “trees” under the top surfaces. Fastest and lightest — for display models only.`, i: `Adds almost no strength. Don’t use it for parts that take load.` },
+  pat_conc: { t: `Concentric`, b: `Rings that follow the outline. Flexible parts and a nice look on see-through prints.` },
+  // ---------- Brim ----------
+  br_brim: { t: `Brim`, b: `Single-layer lines around the part’s first layer. It spreads the grip over a larger area.`,
+    i: `When the Brim box is ticked on the Plater, PrusaSlicer adds an outer brim about ${REEF.brimDefault} mm wide.`, e: `Print Settings → Skirt and brim: Brim type, Brim width, Brim separation gap.` },
+  br_part: { t: `Part footprint`, b: `The part’s first layer.` },
+  br_gap: { t: `Brim separation`, b: `A tiny gap between brim and part.`, e: `0 mm (default) grips best. 0.1 mm makes the brim snap off cleaner, but grips a little less.` },
+  br_layer: { t: `Brim thickness`, b: `A brim is only one layer thick (0.2 mm), so it peels off easily once the print is done.` },
+  br_inner: { t: `Inner brim`, b: `Brim lines inside holes. Only needed for big holes in tall, thin-walled parts.` },
+  // ---------- Supports ----------
+  su_arm: { t: `Overhang (needs support)`, b: `A part sticking straight out. Plastic can’t be printed onto air — it needs support underneath.` },
+  su_bridge: { t: `Bridge (usually OK)`, b: `A gap between two posts. PLA can stretch across short gaps without supports.`,
+    i: `Bridges up to ~2–3 cm usually print fine. Longer ones may sag.`, e: `PrusaSlicer’s “Don’t support bridges” option is on by default, so supports skip normal bridges.` },
+  su_wedge: { t: `Slope`, b: `A slanted wall. Up to about <b>45°</b> from vertical, each layer sits mostly on the one below — no support needed.`,
+    i: `Past 45° the layers droop and curl. Use the slider to see where the line is.` },
+  su_cap: { t: `Overhang above the part`, b: `This ledge hangs over another part of the model, not over the bed.`,
+    i: `Support for it would have to start <b>on your model</b>. That only happens with “Everywhere”, and it leaves marks on that surface.` },
+  su_sup: { t: `Support material`, b: `Temporary plastic that holds up overhangs. You snap it off after printing.` },
+  su_gap: { t: `Contact Z distance`, b: `The small gap between support and part so they come apart.`, e: `About one layer (0.2 mm) by default. Smaller gap = nicer underside but harder to remove.` },
+  su_enf: { t: `Support enforcer (painted)`, b: `Painted with the Paint-on supports tool <kbd>L</kbd>. With “For support enforcers only”, supports appear only where you paint.`,
+    i: `Paint blockers to stop supports in places you don’t want them.` },
+  su_bed: { t: `Print bed`, b: `Supports that start here are easy to remove.` },
+  // ---------- generic ----------
+  x_clog: { t: `Why messy clogs happen`, b: `A part that breaks loose gets dragged by the nozzle. The printer keeps going, piling hot plastic around the nozzle until it clogs.` }
+};
+
+/* Parts for the bed-contact checker. Units mm. side = side-view polygon (x, z; bed at z = 0), fp = footprint from below,
+   A = contact area (mm²), P = footprint perimeter (mm), sup = side-view support polygons. */
+function circlePts(cx, cz, r, a0, a1, n) { var p = []; for (var i = 0; i <= n; i++) { var a = a0 + (a1 - a0) * i / n; p.push([cx + r * Math.cos(a), cz + r * Math.sin(a)]); } return p; }
+var PARTS = {
+  tower: { n: `Tall tower`, d: `20 × 20 × 100 mm`, o: [
+    { n: `Standing up`, side: [[-10, 0], [10, 0], [10, 100], [-10, 100]], fp: { t: "rect", w: 20, d: 20 }, A: 400, P: 80, h: 100,
+      why: `Only a 20 × 20 mm square holds a 100 mm tower. Near the top, every nozzle move rocks it.` },
+    { n: `Lying down`, side: [[-50, 0], [50, 0], [50, 20], [-50, 20]], fp: { t: "rect", w: 100, d: 20 }, A: 2000, P: 240, h: 20, best: 1,
+      why: `Five times the contact and a fifth of the height. Prints faster too — but the layers now run lengthwise, so check it still looks right.` }] },
+  ball: { n: `Ball`, d: `Ø 40 mm sphere`, o: [
+    { n: `As downloaded`, side: circlePts(0, 20, 20, -Math.PI / 2, 1.5 * Math.PI, 40), fp: { t: "circ", r: 2.8 }, A: 25, P: 18, h: 40, sup: "ball",
+      why: `A sphere touches the bed at almost a single point. No brim can save this — it will roll or snap loose.` },
+    { n: `Cut a flat bottom`, side: [[-12, 0]].concat(circlePts(0, 16, 20, -Math.asin(16 / 20), Math.PI + Math.asin(16 / 20), 40)).concat([[12, 0]]), fp: { t: "circ", r: 12 }, A: 452, P: 75, h: 36, sup: "ballcut",
+      why: `Use the <b>Cut</b> tool <kbd>C</kbd> (Normal mode) to slice 4 mm off the bottom. Now it has a real footprint. The lower curve still overhangs, so add supports on build plate only.` },
+    { n: `Cut in half`, side: circlePts(0, 0, 20, 0, Math.PI, 30), fp: { t: "circ", r: 20 }, A: 1257, P: 126, h: 20, best: 1,
+      why: `Two half-balls, flat side down: biggest footprint, no supports. Glue them together afterwards (Cut can add alignment pins).` }] },
+  bracket: { n: `L-bracket`, d: `60 × 40 mm legs, 5 mm thick, 20 mm wide`, o: [
+    { n: `Balanced on one end`, side: [[-2.5, 0], [2.5, 0], [2.5, 55], [37.5, 55], [37.5, 60], [-2.5, 60]], fp: { t: "rect", w: 5, d: 20 }, A: 100, P: 50, h: 60, sup: "lend",
+      why: `Standing on a 5 × 20 mm end with a 35 mm arm hanging off the top: tiny footprint <b>and</b> it needs supports. A classic file-as-downloaded mistake.` },
+    { n: `Long leg flat`, side: [[-30, 0], [30, 0], [30, 5], [-25, 5], [-25, 40], [-30, 40]], fp: { t: "rect", w: 60, d: 20 }, A: 1200, P: 160, h: 40,
+      why: `A full leg on the bed. Stable and no supports. The bend is weaker here because layers stack across it.` },
+    { n: `L-shape flat`, side: [[-30, 0], [30, 0], [30, 20], [-30, 20]], fp: { t: "L" }, A: 475, P: 200, h: 20, best: 1,
+      why: `The L profile lies flat: low, stable, and layer lines run around the bend, so it’s the <b>strongest</b> way to print it.` }] },
+  cone: { n: `Cone`, d: `Ø 40 × 50 mm`, o: [
+    { n: `Point down`, side: [[0, 0], [20, 50], [-20, 50]], fp: { t: "circ", r: 0.6 }, A: 1, P: 4, h: 50, sup: "cone",
+      why: `Balanced on its tip, and the whole thing overhangs. This will fail.` },
+    { n: `Base down`, side: [[-20, 0], [20, 0], [0, 50]], fp: { t: "circ", r: 20 }, A: 1257, P: 126, h: 50, best: 1,
+      why: `Wide base, and the sides lean in, so each layer sits on the one below. No supports needed.` }] }
+};
+
+/* Staff photo / screenshot slots (open the file with ?staff, or press Ctrl+Alt+Shift+P). */
+var PHOTO_KEYS = {
+  ui_printer: `Screenshot: right panel with MK4S / PLA / 0.20mm STRUCTURAL selected`, ui_gz: `Screenshot: Place on face tool with a face highlighted`,
+  ui_sup: `Screenshot: Supports drop-down open`, ui_brim: `Screenshot: Brim checkbox on the Plater`, ui_slice: `Screenshot: Slice now button and sliced info`,
+  ui_export: `Screenshot: Export G-code dialog / USB drive`, pv_vs: `Screenshot: Preview with layer slider at layer 1`,
+  or_contact: `Photo: a print that broke loose (spaghetti / blob)`, br_brim: `Photo: a print with brim, and with brim peeled off`,
+  su_sup: `Photo: organic supports on a real print`, pat_gyroid: `Photo: a cut-open part showing gyroid infill`
+};
+var LINKS = {
+  br_brim: [`Prusa Knowledge Base: Skirt and brim`, `https://help.prusa3d.com/article/skirt-and-brim_133969`],
+};
+</script>
+<script>
+window.addEventListener("error", function (e) {
+  var st = document.getElementById("stage");
+  if (st && !st.querySelector("svg")) st.innerHTML = '<p class="note">The tool couldn\'t start (' + String(e && e.message || "script error").replace(/[<>&]/g, "") + '). Try Chrome, Edge or Safari, or tell REEF staff what this says.</p>';
+});
+</script>
+<script>
+(function () {
+"use strict";
+var INITIAL = document.documentElement.outerHTML;
+/* ---------------- state ---------------- */
+var LS = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+           set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+var S = {
+  mode: +(LS.get("reefps.mode") || 1), tab: LS.get("reefps.tab") || "ui",
+  pv: false, layer: 50,
+  part: "tower", ori: 0, brim: false, brimW: REEF.brimDefault,
+  dens: 15, pat: "grid", walls: 2,
+  bshape: "tower", bOn: true, bW: 5, bType: "outer", bSep: 0, q1: false, q2: false, q3: false,
+  place: "plate", style: "organic", ang: 30, thr: 45,
+  flow: "usb", phase: "before", checks: {}
+};
+if (!(S.mode >= 1 && S.mode <= 3)) S.mode = 1;
+var TABS = ["ui", "orient", "infill", "brim", "sup", "export", "printer"];
+if (TABS.indexOf(S.tab) < 0) S.tab = "ui";
+
+var $ = function (id) { return document.getElementById(id); };
+var stage = $("stage"), rail = $("rail"), legend = $("legend"), tip = $("tip"), card = $("infoCard");
+function hex(c, s) { s = s || 16; return '<svg viewBox="0 0 20 20" width="' + s + '" height="' + s + '" aria-hidden="true" style="flex:none"><path d="M10 1.3 17.6 5.65v8.7L10 18.7 2.4 14.35v-8.7Z" fill="' + c + '"/></svg>'; }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function r1(v) { return Math.round(v * 10) / 10; }
+function r2(v) { return Math.round(v * 100) / 100; }
+var TXT = 'style="fill:var(--fg);stroke:var(--stage);stroke-width:4px;paint-order:stroke;font-size:13px;font-weight:700"';
+function T(x, y, s, anchor, extra) { return '<text x="' + r2(x) + '" y="' + r2(y) + '" text-anchor="' + (anchor || "middle") + '" ' + TXT + (extra || "") + ">" + s + "</text>"; }
+
+/* ---------------- hover info + photos ---------------- */
+var PHOTOS = {}; try { PHOTOS = JSON.parse(document.getElementById("photoData").textContent || "{}"); } catch (e) { PHOTOS = {}; }
+var STAFF = /(^|[?&#])staff\b/.test((location.search + location.hash).replace(/^[?#]/, ""));
+function infoHTML(key, extra, forCard) {
+  var d = I[key]; if (!d) return "";
+  var h = "<h4>" + d.t + (d.tag ? '<span class="tag">' + d.tag + "</span>" : "") + "</h4>";
+  var parts = [d.b, S.mode >= 2 ? d.i : null, S.mode >= 3 ? d.e : null].filter(Boolean);
+  if (!parts.length) parts = [d.i || d.e || ""];
+  h += parts.map(function (p) { return "<p>" + p + "</p>"; }).join("");
+  if (extra) h += '<p class="now">' + extra + "</p>";
+  var more = S.mode === 1 ? (d.i || d.e) : S.mode === 2 ? d.e : null;
+  if (more) h += '<p class="more">' + hex(MODES[S.mode + 1].c, 12) + " More detail in " + MODES[S.mode + 1].n + " mode</p>";
+  if (forCard) {
+    if (PHOTOS[key]) h += '<figure class="ph"><img src="' + PHOTOS[key] + '" alt="Photo: ' + d.t.replace(/"/g, "") + '" data-zoom><figcaption>REEF photo · click to enlarge</figcaption></figure>';
+    if (LINKS[key]) h += '<p class="lnk"><a href="' + LINKS[key][1] + '" target="_blank" rel="noopener">' + LINKS[key][0] + " ↗</a></p>";
+    if (STAFF && PHOTO_KEYS[key]) h += '<div class="staffc"><span class="sub">Suggested: ' + PHOTO_KEYS[key] + '</span><label class="btn sec">' + (PHOTOS[key] ? "Replace image" : "Add image") + '<input type="file" accept="image/*" data-photo="' + key + '" hidden></label>' + (PHOTOS[key] ? '<button type="button" class="btn sec" data-unphoto="' + key + '">Remove</button>' : "") + "</div>";
+  } else if (PHOTOS[key]) h += '<p class="more">Image available · click to pin it in the Info panel</p>';
+  return h;
+}
+var curEl = null, PIN = null;
+function showCard(el, pin) {
+  var key = el.getAttribute("data-info");
+  if (pin) { document.querySelectorAll("svg .on").forEach(function (n) { n.classList.remove("on"); }); el.classList.add("on"); PIN = key; }
+  card.innerHTML = infoHTML(key, el.getAttribute("data-extra"), true) + (PIN === key ? '<p class="pinned">Pinned · click an empty spot to unpin</p>' : "");
+}
+function cardKey(key) { PIN = key; card.innerHTML = infoHTML(key, null, true); }
+document.addEventListener("pointermove", function (e) {
+  if (e.pointerType === "touch") return;
+  var el = e.target && e.target.closest ? e.target.closest("[data-info]") : null;
+  if (!el || e.target.closest("#infoCard")) { tip.hidden = true; curEl = null; return; }
+  if (el !== curEl) { curEl = el; tip.innerHTML = infoHTML(el.getAttribute("data-info"), el.getAttribute("data-extra")); if (!PIN && !STAFF) showCard(el); }
+  tip.hidden = false;
+  var w = tip.offsetWidth, h = tip.offsetHeight, x = e.clientX + 16, y = e.clientY + 16;
+  if (x + w > window.innerWidth - 8) x = e.clientX - w - 12;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - 12;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+});
+document.addEventListener("click", function (e) {
+  if (!e.target.closest) return;
+  if (e.target.closest("#infoCard,#stella,.lb,#staffBar,.mode")) return;
+  var el = e.target.closest("[data-info]");
+  if (el && !e.target.closest("button,input,label")) showCard(el, true);
+  else if (!el && !e.target.closest("button,input,label,a")) { PIN = null; document.querySelectorAll("svg .on").forEach(function (n) { n.classList.remove("on"); }); var pn = card.querySelector(".pinned"); if (pn) pn.remove(); }
+});
+document.addEventListener("focusin", function (e) { var el = e.target.closest && e.target.closest("[data-info]"); if (el && !PIN && !STAFF) showCard(el); });
+window.addEventListener("scroll", function () { tip.hidden = true; curEl = null; }, { passive: true });
+document.addEventListener("click", function (e) {
+  var z = e.target.closest && e.target.closest("[data-zoom]");
+  if (z) { var lb = document.createElement("div"); lb.className = "lb"; lb.innerHTML = '<img src="' + z.src + '" alt="' + z.alt + '"><button type="button" class="btn sec" aria-label="Close">Close</button>'; lb.onclick = function () { lb.remove(); }; document.body.appendChild(lb); }
+});
+
+/* ---------------- mode picker ---------------- */
+var modeBtn = $("modeBtn"), modeMenu = $("modeMenu");
+function drawMode() {
+  var m = MODES[S.mode];
+  modeBtn.innerHTML = hex(m.c, 18) + m.n + ' mode <svg class="chev" viewBox="0 0 12 12"><path d="M2 4l4 4 4-4" stroke="#fff" stroke-width="1.6" fill="none"/></svg>';
+  modeMenu.innerHTML = [1, 2, 3].map(function (i) {
+    return '<li role="none"><button type="button" role="menuitemradio" aria-checked="' + (i === S.mode) + '" data-mode="' + i + '">' + hex(MODES[i].c, 18) +
+      "<span>" + MODES[i].n + " mode<small>" + MODES[i].d + "</small></span></button></li>";
+  }).join("");
+  document.body.setAttribute("data-mode", S.mode);
+  document.documentElement.style.setProperty("--lvl", m.c);
+}
+modeBtn.addEventListener("click", function (e) { e.stopPropagation(); var o = modeMenu.hidden; modeMenu.hidden = !o; modeBtn.setAttribute("aria-expanded", o); });
+modeMenu.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-mode]"); if (!b) return;
+  S.mode = +b.getAttribute("data-mode"); LS.set("reefps.mode", S.mode);
+  modeMenu.hidden = true; modeBtn.setAttribute("aria-expanded", "false"); drawMode(); render();
+});
+document.addEventListener("click", function () { if (!modeMenu.hidden) { modeMenu.hidden = true; modeBtn.setAttribute("aria-expanded", "false"); } });
+document.addEventListener("keydown", function (e) { if (e.key === "Escape") { modeMenu.hidden = true; tip.hidden = true; } });
+
+/* ---------------- tabs + generic controls ---------------- */
+$("tabSeg").addEventListener("click", function (e) {
+  var b = e.target.closest("button"); if (!b) return; S.tab = b.getAttribute("data-v"); LS.set("reefps.tab", S.tab); render();
+});
+function seg(key, opts) {
+  var cur = S[key];
+  return '<div class="seg" role="group">' + opts.map(function (o) {
+    return '<button type="button" data-set="' + key + '" data-v="' + o[0] + '" aria-pressed="' + (String(cur) === String(o[0])) + '"' +
+      (o[2] ? ' data-min="' + o[2] + '"' : "") + (o[3] ? ' data-info="' + o[3] + '"' : "") + ">" + o[1] + "</button>";
+  }).join("") + "</div>";
+}
+function slider(key, label, min, max, step, unit, info, minLvl) {
+  return '<div class="slide"' + (minLvl ? ' data-min="' + minLvl + '"' : "") + "><span" + (info ? ' class="term" data-info="' + info + '"' : "") + ">" + label + '</span><input type="range" data-set="' + key + '" data-u="' + unit + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + S[key] + '" aria-label="' + label.replace(/<[^>]+>/g, "") + '"><output>' + S[key] + unit + "</output></div>";
+}
+function check(key, label, minLvl) { return '<label class="chk"' + (minLvl ? ' data-min="' + minLvl + '"' : "") + '><input type="checkbox" data-set="' + key + '"' + (S[key] ? " checked" : "") + "> <span>" + label + "</span></label>"; }
+function parseV(v) { return /^-?\d+(\.\d+)?$/.test(v) ? +v : v === "true" ? true : v === "false" ? false : v; }
+rail.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-set]");
+  if (b && b.tagName === "BUTTON") { var k = b.getAttribute("data-set"); S[k] = parseV(b.getAttribute("data-v")); if (k === "part") S.ori = 0; render(); return; }
+  var g = e.target.closest("[data-go]");
+  if (g) { var a = g.getAttribute("data-go").split(":"); S.tab = a[0]; if (a[1]) S.dens = +a[1]; if (a[2]) S.walls = +a[2]; LS.set("reefps.tab", S.tab); render(); }
+});
+rail.addEventListener("change", function (e) {
+  var t = e.target;
+  if (t.type === "checkbox" && t.hasAttribute("data-set")) { S[t.getAttribute("data-set")] = t.checked; render(); }
+  else if (t.type === "checkbox" && t.hasAttribute("data-chk")) { S.checks[t.getAttribute("data-chk")] = t.checked; updateProg(); }
+  else if (t.type === "range") render();
+});
+rail.addEventListener("input", function (e) {
+  var t = e.target; if (t.type !== "range") return;
+  S[t.getAttribute("data-set")] = +t.value;
+  var o = t.parentNode.querySelector("output"); if (o) o.textContent = t.value + (t.getAttribute("data-u") || "");
+  var v = VIEWS[S.tab]; stage.innerHTML = v.stage(); if (v.live) v.live();
+});
+/* ================= PRUSASLICER BASICS ================= */
+function uiSVG() {
+  var s = "", W = 640, H = 440, side = 432, mid = "#C9CDD1", lt = "#F3F3F3";
+  s += '<defs><linearGradient id="vbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDDDE"/><stop offset="1" stop-color="#9C9EA0"/></linearGradient></defs>';
+  s += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fff" stroke="#8A9095"/>';
+  s += '<rect x="0" y="0" width="' + W + '" height="13" fill="' + lt + '"/><text x="16" y="10" style="font-size:8px;fill:#5A5F63">PrusaSlicer-2.9.6 based on Slic3r</text><circle cx="8" cy="6.5" r="3" fill="#F15B29"/>';
+  s += [["File", 6], ["Edit", 28], ["Window", 50], ["View", 84], ["Configuration", 108], ["Help", 166]].map(function (m) { return '<text x="' + m[1] + '" y="24" style="font-size:8.5px;fill:#424143">' + m[0] + "</text>"; }).join("");
+  // tab bar
+  s += '<g data-info="ui_top" tabindex="0"><rect x="0" y="29" width="' + W + '" height="20" fill="#fff"/>';
+  [["Plater", 4, 38], ["Print Settings", 44, 60], ["Filaments", 106, 44], ["Printers", 152, 40], ["Printables", 196, 46]].forEach(function (t, i) {
+    s += '<rect x="' + t[1] + '" y="31" width="' + t[2] + '" height="16" rx="3" fill="' + (i === 0 ? "#010101" : i === 1 ? "#EADCDC" : "#fff") + '"/><text x="' + (t[1] + t[2] / 2) + '" y="42" text-anchor="middle" style="font-size:8px;fill:' + (i === 0 ? "#fff" : "#010101") + '">' + t[0] + "</text>";
+  });
+  s += '<rect x="282" y="32" width="150" height="14" fill="#fff" stroke="#8A9095"/><text x="286" y="42" style="font-size:7.5px;fill:#5A5F63">Enter a search term</text><circle cx="424" cy="38.5" r="3.5" fill="none" stroke="#F15B29" stroke-width="1.2"/></g>';
+  s += '<g data-info="ui_mode" tabindex="0">' + '<path transform="translate(520,33) scale(.55)" d="M10 1.3 17.6 5.65v8.7L10 18.7 2.4 14.35v-8.7Z" fill="#5DBB46"/>' + '<text x="533" y="42" style="font-size:8.5px;fill:#010101">Beginner mode ▾</text></g>';
+  s += '<text x="598" y="42" style="font-size:8px;fill:#424143">◯ Log in ▾</text>';
+  // 3D / preview area
+  s += '<rect x="0" y="49" width="' + side + '" height="' + (H - 49) + '" fill="url(#vbg)"/>';
+  if (!S.pv) {
+    // top toolbar (dark, translucent)
+    s += '<g data-info="ui_tb" tabindex="0"><rect x="70" y="52" width="290" height="30" rx="2" fill="#5E5F61" opacity=".85"/>';
+    ["⊞", "⊟", "🗑", "▦", "⬚", "⧉", "⎘", "◫", "≡", "↶", "↷"].forEach(function (c, i) { s += '<text x="' + (84 + i * 25.5) + '" y="73" text-anchor="middle" style="font-size:15px;fill:' + (i === 0 ? "#fff" : "#A9ABAD") + '">' + c + "</text>"; });
+    s += "</g>";
+    // left tools (Beginner mode shows Move, Scale, Rotate, Place on face, Measure)
+    s += '<g data-info="ui_gz" tabindex="0"><rect x="0" y="128" width="38" height="164" rx="3" fill="#5E5F61" opacity=".85"/>';
+    ["✥", "⤡", "⟳", "▱", "📏"].forEach(function (c, i) { var y = 152 + i * 31; s += (i === 3 ? '<rect x="5" y="' + (y - 18) + '" width="28" height="26" rx="3" fill="#FCC424"/>' : "") + '<text x="19" y="' + y + '" text-anchor="middle" style="font-size:16px;fill:' + (i === 3 ? "#010101" : "#D7DBDE") + '">' + c + "</text>"; });
+    s += "</g>";
+    // MK4S sheet (isometric)
+    var A = [222, 96], B = [400, 212], C = [206, 352], D = [30, 230], grid = "";
+    function L(p, q, t) { return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]; }
+    for (var i = 1; i < 10; i++) { var a = L(A, B, i / 10), b = L(D, C, i / 10), c = L(A, D, i / 10), d = L(B, C, i / 10); grid += "M" + r1(a[0]) + " " + r1(a[1]) + "L" + r1(b[0]) + " " + r1(b[1]) + "M" + r1(c[0]) + " " + r1(c[1]) + "L" + r1(d[0]) + " " + r1(d[1]); }
+    s += '<g data-info="ui_bed" tabindex="0"><polygon points="' + [A, B, C, D].map(function (p) { return p.join(","); }).join(" ") + '" fill="#2B2829" stroke="#3A3536" stroke-width="6" stroke-linejoin="round"/>' +
+      '<polygon points="' + [L(A, B, .02), L(B, C, .02), L(C, D, .02), L(D, A, .02)].map(function (p) { return r1(p[0]) + "," + r1(p[1]); }).join(" ") + '" fill="none" stroke="#fff" stroke-width=".8"/><path d="' + grid + '" stroke="#6A6566" stroke-width=".6"/>' +
+      '<text transform="translate(300,300) rotate(-33)" style="font-size:9px;font-weight:700;fill:#8A9095">ORIGINAL PRUSA <tspan fill="#F15B29">MK4S</tspan></text></g>';
+    s += '<g data-info="ui_view" tabindex="0"><path d="M206 350 l-22 -14" stroke="#5DBB46" stroke-width="2"/><path d="M206 350 l26 -16" stroke="#B71F34" stroke-width="2"/><path d="M206 350 v-30" stroke="#0000CC" stroke-width="2"/></g>';
+    s += '<g data-info="ui_part" tabindex="0"><polygon points="190,240 230,262 230,222 190,200" fill="#05A7E0" stroke="#010101"/><polygon points="230,262 262,244 262,204 230,222" fill="#0386B4" stroke="#010101"/><polygon points="190,200 230,222 262,204 222,182" fill="#7DCFD8" stroke="#010101"/></g>';
+  } else {
+    var Lr = S.layer, by = 380, lh = 4, cols = { per: "#F15B29", inf: "#B71F34", sup: "#5DBB46", brim: "#05A7E0", top: "#7A3E9D" };
+    s += '<g data-info="ui_bed"><rect x="70" y="' + by + '" width="320" height="10" fill="#2B2829"/></g>';
+    s += '<g data-info="pv_brim"><rect x="128" y="' + (by - lh) + '" width="18" height="' + lh + '" fill="' + cols.brim + '"/><rect x="194" y="' + (by - lh) + '" width="18" height="' + lh + '" fill="' + cols.brim + '"/></g>';
+    var per = "", inf = "", sup = "", top = "";
+    for (var k = 1; k <= Math.min(Lr, 50); k++) {
+      var y = by - k * lh, solid = k <= 4 || (k > 40 && k <= 44);
+      per += '<rect x="146" y="' + y + '" width="6" height="' + (lh - 0.6) + '"/><rect x="188" y="' + y + '" width="6" height="' + (lh - 0.6) + '"/>';
+      if (k > 44 || solid) top += '<rect x="152" y="' + y + '" width="36" height="' + (lh - 0.6) + '"/>'; else inf += '<rect x="' + (152 + (k % 2 ? 4 : 10)) + '" y="' + y + '" width="20" height="' + (lh - 0.6) + '"/>';
+      if (k > 40 && k <= 44) per += '<rect x="194" y="' + y + '" width="120" height="' + (lh - 0.6) + '"/>';
+      if (k <= 39) for (var c2 = 0; c2 < 9; c2++) sup += '<rect x="' + (222 + c2 * 11) + '" y="' + y + '" width="3" height="' + lh + '"/>';
+    }
+    s += '<g data-info="pv_sup" fill="' + cols.sup + '">' + sup + '</g><g data-info="pv_per" fill="' + cols.per + '">' + per + '</g><g data-info="pv_inf" fill="' + cols.inf + '">' + inf + '</g><g data-info="pv_inf" fill="' + cols.top + '">' + top + "</g>";
+    if (Lr <= 3) s += '<g data-info="pv_first"><rect x="120" y="' + (by - lh * Lr - 6) + '" width="100" height="' + (lh * Lr + 10) + '" fill="none" stroke="#FCC424" stroke-width="3" stroke-dasharray="5 3"/>' + T(170, by - lh * Lr - 14, "First layer = all the grip you get") + "</g>";
+    var sy = by - Lr * lh;
+    s += '<g data-info="pv_vs" tabindex="0"><rect x="412" y="176" width="6" height="204" rx="3" fill="' + mid + '"/><rect x="404" y="' + (sy - 8) + '" width="22" height="16" rx="4" fill="#F15B29"/><text x="398" y="' + (sy + 4) + '" text-anchor="end" style="font-size:11px;font-weight:700;fill:#010101">' + r2(Lr * 0.2) + " mm · " + Lr + "</text></g>";
+    s += '<g data-info="pv_hs"><rect x="90" y="404" width="300" height="6" rx="3" fill="' + mid + '"/><rect x="300" y="399" width="16" height="16" rx="4" fill="#F15B29"/></g>';
+    s += '<g data-info="pv_legend" tabindex="0"><rect x="12" y="58" width="150" height="112" rx="5" fill="#fff" stroke="' + mid + '"/><text x="20" y="74" style="font-size:11px;font-weight:700;fill:#010101">Feature type</text>' +
+      [["Perimeter", cols.per], ["Internal infill", cols.inf], ["Solid / top infill", cols.top], ["Support material", cols.sup], ["Skirt / brim", cols.brim]].map(function (r, i) { return '<rect x="20" y="' + (82 + i * 17) + '" width="12" height="12" fill="' + r[1] + '"/><text x="38" y="' + (92 + i * 17) + '" style="font-size:11px;fill:#010101">' + r[0] + "</text>"; }).join("") + "</g>";
+  }
+  // bottom-left: 3D view / Preview buttons
+  s += '<g data-info="ui_views" tabindex="0"><rect x="0" y="404" width="72" height="36" fill="#6A6566"/><rect x="' + (S.pv ? 36 : 0) + '" y="404" width="36" height="36" fill="#010101"/>' +
+    '<path d="M8 416 l10 -5 10 5 v12 l-10 5 -10 -5 Z M8 416 l10 5 10 -5 M18 421 v12" stroke="#fff" fill="none" stroke-width="1.4"/>' +
+    [0, 1, 2, 3, 4].map(function (i) { return '<path d="M44 ' + (413 + i * 4) + ' h20" stroke="#fff" stroke-width="1.6"/>'; }).join("") + "</g>";
+  // right sidebar
+  s += '<rect x="' + side + '" y="49" width="' + (W - side) + '" height="' + (H - 49) + '" fill="#fff"/>';
+  function combo(y, lab, val, key, sw) {
+    return '<g data-info="' + key + '" tabindex="0"><text x="' + (side + 4) + '" y="' + y + '" style="font-size:9px;fill:#010101">' + lab + '</text><rect x="' + (side + 4) + '" y="' + (y + 4) + '" width="190" height="16" fill="#fff" stroke="#8A9095"/>' +
+      (sw ? '<rect x="' + (side + 8) + '" y="' + (y + 7) + '" width="12" height="10" fill="' + sw + '"/>' : '<circle cx="' + (side + 14) + '" cy="' + (y + 12) + '" r="3.5" fill="none" stroke="#F15B29"/>') +
+      '<rect x="' + (side + 24) + '" y="' + (y + 8) + '" width="5" height="7" rx="1" fill="#424143"/><text x="' + (side + 33) + '" y="' + (y + 15.5) + '" style="font-size:8.5px;fill:#010101">' + val + '</text><path d="M' + (side + 184) + " " + (y + 10) + ' l3 3 3 -3" stroke="#424143" fill="none"/><circle cx="' + (side + 202) + '" cy="' + (y + 12) + '" r="4" fill="none" stroke="#F15B29" stroke-width="1.4"/></g>';
+  }
+  s += combo(64, "Print settings:", REEF.print, "ui_print") + combo(94, "Filament:", REEF.filament, "ui_fil", "#F15B29") + combo(124, "Printer:", REEF.printerShort, "ui_printer");
+  s += '<g data-info="ui_sup" tabindex="0"><text x="' + (side + 4) + '" y="165" style="font-size:9px;fill:#010101">Supports:</text><rect x="' + (side + 46) + '" y="154" width="148" height="16" fill="#fff" stroke="#8A9095"/><text x="' + (side + 50) + '" y="165" style="font-size:8.5px;fill:#010101">' + { none: "None", plate: "Support on build plate only", enf: "For support enforcers only", every: "Everywhere" }[S.place] + "</text></g>";
+  s += '<g data-info="ui_inf" tabindex="0"><text x="' + (side + 4) + '" y="188" style="font-size:9px;fill:#010101">Infill:</text><rect x="' + (side + 30) + '" y="177" width="56" height="16" fill="#fff" stroke="#8A9095"/><text x="' + (side + 35) + '" y="188" style="font-size:8.5px;fill:#010101">' + S.dens + "%  ▾</text></g>";
+  s += '<g data-info="ui_brim" tabindex="0"><text x="' + (side + 96) + '" y="188" style="font-size:9px;fill:#010101">Brim:</text><rect x="' + (side + 122) + '" y="179" width="11" height="11" fill="' + (S.brim ? "#010101" : "#fff") + '" stroke="#424143"/>' + (S.brim ? '<path d="M' + (side + 124) + " 185 l2.5 2.5 4 -5" + '" stroke="#fff" stroke-width="1.6" fill="none"/>' : "") + "</g>";
+  s += '<g data-info="ui_list" tabindex="0"><rect x="' + (side + 4) + '" y="204" width="198" height="56" fill="' + lt + '" stroke="' + mid + '"/><text x="' + (side + 10) + '" y="217" style="font-size:8.5px;font-weight:700;fill:#010101">Name</text><rect x="' + (side + 6) + '" y="222" width="194" height="14" fill="#7DCFD8"/><text x="' + (side + 12) + '" y="232" style="font-size:8.5px;fill:#010101">my_part.stl</text></g>';
+  if (S.pv) s += '<g data-info="ui_info" tabindex="0"><text x="' + (side + 4) + '" y="290" style="font-size:9px;font-weight:700;fill:#010101">Sliced Info</text><text x="' + (side + 4) + '" y="305" style="font-size:8.5px;fill:#424143">Used Filament (g): 15.5</text><text x="' + (side + 4) + '" y="319" style="font-size:8.5px;fill:#424143">Estimated printing time: 52m</text></g>';
+  s += '<g data-info="' + (S.pv ? "ui_export" : "ui_slice") + '" tabindex="0"><rect x="' + (side + 4) + '" y="412" width="' + (W - side - 8) + '" height="22" fill="' + (S.pv ? "#F15B29" : "#E3E6E8") + '"/><text x="' + ((side + W) / 2) + '" y="427" text-anchor="middle" style="font-size:10px;font-weight:700;fill:' + (S.pv ? "#010101" : "#424143") + '">' + (S.pv ? "Export G-code" : "Slice now") + "</text></g>";
+  return '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="PrusaSlicer 2.9 window in Beginner mode (simplified)">' + s + "</svg>";
+}
+
+var SHORT = [["F", "Place on face", 1], ["A", "Arrange all parts", 1], ["Ctrl + R", "Slice now", 1], ["Ctrl + G", "Export G-code", 1], ["Tab", "Switch 3D view ↔ Preview", 1], ["Del", "Delete selected", 1],
+  ["R", "Rotate", 2], ["S", "Scale", 2], ["M", "Move", 2], ["C", "Cut", 2], ["L", "Paint-on supports", 2], ["+ / −", "Add / remove a copy (instance)", 2], ["2", "Bottom view — see what touches the bed", 2], ["Z", "Zoom to selection", 2],
+  ["Ctrl + I", "Import a model", 3], ["P", "Seam painting", 3], ["0 – 6", "Camera views", 3]];
+var ui = {
+  stage: function () { return "<h3>PrusaSlicer 2.9 · Beginner mode · " + (S.pv ? "Preview" : "Plater, 3D view") + " · simplified drawing</h3>" + uiSVG(); },
+  legend: function () { return "<span>" + hex(MODES[S.mode].c, 14) + "Hover any part of the window to learn what it does</span>"; },
+  rail: function () {
+    return '<section class="grp"><h2 class="lbl">View</h2>' + seg("pv", [[false, "3D view"], [true, "Preview (sliced)"]]) +
+      (S.pv ? slider("layer", "Layer", 1, 50, 1, "", "pv_vs") + '<p class="note">Drag to layer 1: that small first layer is everything holding your print to the bed.</p>' : '<p class="note">The 3D view is where you add, orient and arrange models. Preview shows the result after slicing.</p>') + "</section>" +
+      '<section class="grp" style="--c:var(--yellow)"><h2 class="lbl">Set these three first</h2><ol class="plain" style="padding-left:20px;margin:0">' +
+      '<li><span class="term" data-info="ui_printer">Printer</span>: <b>' + REEF.printer + "</b></li>" +
+      '<li><span class="term" data-info="ui_fil">Filament</span>: <b>' + REEF.filament + "</b></li>" +
+      '<li><span class="term" data-info="ui_print">Print settings</span>: <b>' + REEF.print + "</b></li></ol>" +
+      '<p class="note">REEF prints PLA only, with 0.4 mm nozzles. If the printer says “sliced for a different printer”, re-slice with the MK4S preset.</p>' + '<p class="lnk" style="margin:0"><a href="' + REEF.guide + '" target="_blank" rel="noopener">Read the full REEF FDM 3D Printing Guide (MK4S) ↗</a></p>' + '</section>' +
+      '<section class="grp" style="--c:var(--blue)"><h2 class="lbl">Handy shortcuts</h2><table class="cmp"><tbody>' +
+      SHORT.map(function (r) { return '<tr data-min="' + r[2] + '"><td><kbd>' + r[0] + "</kbd></td><td>" + r[1] + "</td></tr>"; }).join("") + "</tbody></table>" +
+      '<p class="note" data-min="2">Everything you normally need is on the right panel in Beginner mode. Switch PrusaSlicer to Normal only when you need a specific setting or tool.</p></section>';
+  }
+};
+
+/* ================= BED CONTACT ================= */
+function oriCalc(o, brimOn, w) {
+  var A = o.A, ww = brimOn ? w : 0, Ae = A + o.P * ww + Math.PI * ww * ww, ratio0 = o.h / Math.sqrt(A), ratio = o.h / Math.sqrt(Ae), v;
+  if (A < REEF.minArea) v = { c: "r", ic: "✕", t: "Re-orient or cut a flat", m: brimOn ? "Even with a brim, almost nothing of the part itself touches the bed. A brim can’t hold this." : "Almost nothing touches the bed. This print will break loose." };
+  else if (ratio >= REEF.badRatio) v = { c: "r", ic: "✕", t: "Re-orient", m: "Far too tall for its footprint." };
+  else if (Ae < REEF.okArea || ratio > REEF.maxRatio) v = { c: "y", ic: "!", t: brimOn ? "Wider brim — or re-orient" : "Add a brim", m: brimOn ? "Better, but still risky. Try a wider brim or a lower orientation." : "Small footprint for its height. Tick <b>Brim</b>, or find a lower orientation." };
+  else v = { c: "g", ic: "✓", t: "Good contact", m: brimOn && (A < REEF.okArea || ratio0 > REEF.maxRatio) ? "The brim makes this stable." : "Plenty of grip for its height." };
+  return { A: A, Ae: Ae, ratio: ratio, v: v };
+}
+function supPolys(key) {
+  var g = 0.6, p = [];
+  if (key === "ball") { var a = [[-14, 0]]; for (var x = -14; x <= 14.01; x += 1) a.push([x, 20 - Math.sqrt(400 - x * x) - g]); a.push([14, 0]); p.push(a.filter(function (q) { return q[1] >= 0; })); }
+  if (key === "ballcut") [-1, 1].forEach(function (sd) { var a = [[sd * 12.6, 0]]; for (var x = 12.6; x <= 14.15; x += 0.25) a.push([sd * x, 16 - Math.sqrt(400 - x * x) - g + 0.1]); a.push([sd * 14.15, 0]); p.push(a.map(function (q) { return [q[0], Math.max(0, q[1])]; })); });
+  if (key === "lend") p.push([[3.2, 0], [37.5, 0], [37.5, 55 - g], [3.2, 55 - g]]);
+  if (key === "cone") { p.push([[-20, 0], [-0.8, 0], [-20, 48.4]]); p.push([[0.8, 0], [20, 0], [20, 48.4]]); }
+  return p;
+}
+function fpShape(fp, k, cx, cy, extra) {
+  if (fp.t === "rect") return '<rect x="' + r2(cx - fp.w * k / 2) + '" y="' + r2(cy - fp.d * k / 2) + '" width="' + r2(fp.w * k) + '" height="' + r2(fp.d * k) + '"' + extra + "/>";
+  if (fp.t === "circ") return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r2(Math.max(1.2, fp.r * k)) + '"' + extra + "/>";
+  var P = [[-30, -20], [30, -20], [30, -15], [-25, -15], [-25, 20], [-30, 20]];
+  return '<polygon points="' + P.map(function (q) { return r2(cx + q[0] * k) + "," + r2(cy + q[1] * k); }).join(" ") + '"' + extra + "/>";
+}
+function fpDim(fp) { return fp.t === "rect" ? Math.max(fp.w, fp.d) : fp.t === "circ" ? 2 * fp.r : 60; }
+function orientSVG() {
+  var part = PARTS[S.part], o = part.o[S.ori], k = 2.6, cx = 200, by = 330, w = S.brim ? S.brimW : 0, s = "";
+  function P(q) { return r2(cx + q[0] * k) + "," + r2(by - q[1] * k); }
+  s += '<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E3E6E8"/><line x1="0" y1="0" x2="0" y2="6" stroke="#5A5F63" stroke-width="2"/></pattern></defs>';
+  s += '<g data-info="or_bed"><rect x="20" y="' + by + '" width="370" height="16" fill="#3A3536"/><rect x="20" y="' + by + '" width="370" height="3" fill="#8A9095"/></g>';
+  (o.sup ? supPolys(o.sup) : []).forEach(function (pp) { s += '<g data-info="or_sup"><polygon points="' + pp.map(P).join(" ") + '" fill="url(#hatch)" stroke="#5A5F63"/></g>'; });
+  s += '<g data-info="or_part" tabindex="0"><polygon points="' + o.side.map(P).join(" ") + '" fill="#05A7E0" stroke="#010101" stroke-width="1.5"/></g>';
+  var hw = o.fp.t === "rect" ? o.fp.w / 2 : o.fp.t === "circ" ? o.fp.r : 30;
+  if (w) s += '<g data-info="or_brim"><rect x="' + r2(cx - (hw + w) * k) + '" y="' + (by - 3) + '" width="' + r2(w * k) + '" height="3" fill="#FCC424" stroke="#010101" stroke-width=".6"/><rect x="' + r2(cx + hw * k) + '" y="' + (by - 3) + '" width="' + r2(w * k) + '" height="3" fill="#FCC424" stroke="#010101" stroke-width=".6"/></g>';
+  s += '<g data-info="or_contact" tabindex="0"><rect x="' + r2(cx - Math.max(hw * k, 2)) + '" y="' + (by - 2) + '" width="' + r2(Math.max(hw * 2 * k, 4)) + '" height="6" fill="#B71F34"/></g>';
+  var top = by - o.h * k;
+  s += '<g data-info="or_h"><path d="M34 ' + by + " V" + r2(top) + " M28 " + r2(top) + ' h12" style="stroke:var(--fg)" stroke-width="1.5"/>' + T(44, (by + top) / 2, o.h + " mm", "start") + "</g>";
+  // footprint (from below)
+  var fx = 520, fy = 190, kt = Math.min(4, 150 / (fpDim(o.fp) + 2 * w));
+  s += '<rect x="420" y="70" width="200" height="240" rx="6" style="fill:var(--surface);stroke:var(--line)"/>' + T(520, 92, "Footprint, from below");
+  s += '<g data-info="or_top" tabindex="0">';
+  if (w) s += '<g data-info="or_brim">' + fpShape(o.fp, kt, fx, fy, ' fill="#FCC424" stroke="#FCC424" stroke-width="' + r2(2 * w * kt) + '" stroke-linejoin="round"') + "</g>";
+  s += fpShape(o.fp, kt, fx, fy, ' fill="#B71F34" stroke="#010101" stroke-width="1"') + "</g>";
+  var c = oriCalc(o, S.brim, S.brimW);
+  s += T(520, 290, Math.round(c.Ae).toLocaleString() + " mm²" + (w ? " with brim" : ""));
+  return '<svg viewBox="0 0 640 370" role="img" aria-label="Bed contact checker">' + s + "</svg>";
+}
+function orientBox() {
+  var o = PARTS[S.part].o[S.ori], c = oriCalc(o, S.brim, S.brimW);
+  return '<div class="verdict ' + c.v.c + '"><span class="ic" aria-hidden="true">' + c.v.ic + "</span><div><b class=\"vt\">" + c.v.t + "</b>" + c.v.m + (o.sup ? "<br><b style=\"display:inline;font-size:12px\">+ Needs supports</b> in this orientation." : "") + "</div></div>" +
+    '<div class="cards"><div class="card" data-info="or_contact"><span>Contact area</span><b>' + Math.round(c.A).toLocaleString() + "</b><small>mm² (part only)</small></div>" +
+    '<div class="card" data-info="or_h"><span>Height</span><b>' + o.h + "</b><small>mm</small></div>" +
+    (S.brim ? '<div class="card" data-info="or_brim"><span>With brim</span><b>' + Math.round(c.Ae).toLocaleString() + "</b><small>mm² total grip</small></div>" : "") +
+    '<div class="card" data-info="or_h" data-min="2"><span>Height ÷ √area</span><b>' + r1(c.ratio) + "</b><small>under " + REEF.maxRatio + " is stable</small></div></div>" +
+    '<p class="note">' + o.why + "</p>";
+}
+var orient = {
+  stage: function () { var p = PARTS[S.part]; return "<h3>" + p.n + " · " + p.d + " · " + p.o[S.ori].n + "</h3>" + orientSVG(); },
+  legend: function () { return '<span><i class="sw fill" style="background:#B71F34"></i>Touches the bed</span><span><i class="sw fill" style="background:#FCC424"></i>Brim</span><span><i class="sw fill" style="background:#05A7E0"></i>Part</span><span><i class="sw fill" style="background:repeating-linear-gradient(45deg,#5A5F63 0 2px,#E3E6E8 2px 5px)"></i>Needs support</span>'; },
+  rail: function () {
+    var p = PARTS[S.part];
+    return '<section class="grp"><h2 class="lbl">Try a part</h2>' + seg("part", Object.keys(PARTS).map(function (k) { return [k, PARTS[k].n]; })) +
+      '<div class="sub">Orientation on the bed</div>' + seg("ori", p.o.map(function (o, i) { return [i, o.n + (o.best ? " ★" : "")]; })) +
+      check("brim", "Add a brim") + (S.brim ? slider("brimW", "Brim width", 1, 10, 1, " mm", "or_brim") : "") + '<div id="live">' + orientBox() + "</div></section>" +
+      '<section class="grp" style="--c:var(--red)"><h2 class="lbl">Why this matters</h2><p style="margin:0">A print is held down only by its first layer. When that patch is too small, the nozzle knocks the part loose. The printer doesn’t notice — it keeps pushing out plastic into the air.</p>' +
+      '<ul class="plain"><li><b>Spaghetti</b>: loose strands everywhere.</li><li><b>Blob</b>: hot plastic wraps around the nozzle and heater block.</li><li><b>Clog</b>: the printer is out of service until staff take the hotend apart.</li></ul></section>' +
+      '<section class="grp" style="--c:var(--yellow)"><h2 class="lbl">Fix it, in this order</h2><ol class="plain" style="padding-left:20px;margin:0">' +
+      '<li><b>Place on face</b> <kbd>F</kbd>: click the biggest flat face so it sits on the bed.</li><li><b>Rotate / lay it down</b> <kbd>R</kbd>: low and wide beats tall and skinny.</li>' +
+      '<li><b>Cut</b> <kbd>C</kbd> a flat bottom, or split the part in two (Cut is in PrusaSlicer’s Normal mode).</li><li><b>Brim</b>: tick the box on the right panel.</li><li>Still unsure? <b>Ask REEF staff</b> before you print.</li></ol>' +
+      '<p class="note" data-min="2">Check in PrusaSlicer: press <kbd>2</kbd> for the bottom view, or drag the Preview layer slider to layer 1.</p>' +
+      '<p class="note" data-min="3">REEF rule of thumb used here: at least ' + REEF.minArea + ' mm² of the part itself on the bed, and height ÷ √(contact area) under ' + REEF.maxRatio + ' (under ' + REEF.badRatio + ' with a brim). Staff can change these numbers at the top of the file.</p></section>';
+  },
+  live: function () { var l = $("live"); if (l) l.innerHTML = orientBox(); }
+};
+/* ================= INFILL ================= */
+var PATS = { grid: ["Grid", 1, 1], gyroid: ["Gyroid", 1, 1.1], light: ["Lightning", 1, 0.1], rect: ["Rectilinear", 2, 0.9], cubic: ["Cubic", 2, 1.05], honey: ["Honeycomb", 2, 1.15], conc: ["Concentric", 2, 0.7] };
+var PATKEY = { grid: "pat_grid", gyroid: "pat_gyroid", light: "pat_light", rect: "pat_rect", cubic: "pat_cubic", honey: "pat_honey", conc: "pat_conc" };
+function linesPath(cx, cy, R, ang, sp, off) {
+  var a = ang * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux, d = "", t0 = -R + ((off || 0) % sp);
+  for (var t = t0; t <= R; t += sp) d += "M" + r1(cx + nx * t - ux * R) + " " + r1(cy + ny * t - uy * R) + "L" + r1(cx + nx * t + ux * R) + " " + r1(cy + ny * t + uy * R);
+  return d;
+}
+function patternPath(p, x0, y0, sz, b) {
+  var cx = x0 + sz / 2, cy = y0 + sz / 2, R = sz * 0.75, d = "", i, x, y;
+  if (p === "grid") { var g = Math.max(b * 2, 4); return linesPath(cx, cy, R, 45, g) + linesPath(cx, cy, R, -45, g); }
+  if (p === "rect") return linesPath(cx, cy, R, 45, Math.max(b, 3.2));
+  if (p === "cubic") { var c3 = Math.max(b * 3, 5); return linesPath(cx, cy, R, 0, c3, c3 / 3) + linesPath(cx, cy, R, 60, c3) + linesPath(cx, cy, R, 120, c3, c3 * 2 / 3); }
+  if (p === "gyroid") {
+    var sp = Math.max(b * 1.15, 3.4), lam = sp * 2.6;
+    for (y = y0 - sp; y <= y0 + sz + sp; y += sp) { d += "M" + x0 + " " + r1(y); for (x = x0; x <= x0 + sz; x += 3) d += "L" + r1(x) + " " + r1(y + sp * 0.42 * Math.sin((x - x0) / lam * 2 * Math.PI)); }
+    return d;
+  }
+  if (p === "honey") {
+    var a = Math.max(b * 1.25, 3.5), h = a * Math.sqrt(3), col = 0;
+    for (x = x0 - a; x <= x0 + sz + a; x += a * 1.5, col++) for (y = y0 - h + (col % 2 ? h / 2 : 0); y <= y0 + sz + h; y += h) {
+      d += "M" + r1(x + a) + " " + r1(y); for (i = 1; i <= 6; i++) d += "L" + r1(x + a * Math.cos(i * Math.PI / 3)) + " " + r1(y + a * Math.sin(i * Math.PI / 3));
+    }
+    return d;
+  }
+  if (p === "conc") { for (i = 0; i * Math.max(b, 3.2) < sz / 2; i++) { var o = i * Math.max(b, 3.2); d += "M" + r1(x0 + o) + " " + r1(y0 + o) + "h" + r1(sz - 2 * o) + "v" + r1(sz - 2 * o) + "h" + r1(-(sz - 2 * o)) + "Z"; } return d; }
+  if (p === "light") {
+    var seed = 7; function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+    function br(x, y, ang, len, dep) { if (dep <= 0 || len < 6) return; var x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len; d += "M" + r1(x) + " " + r1(y) + "L" + r1(x2) + " " + r1(y2); br(x2, y2, ang - 0.5 - rnd() * 0.4, len * 0.68, dep - 1); br(x2, y2, ang + 0.5 + rnd() * 0.4, len * 0.68, dep - 1); }
+    var n = Math.max(2, Math.round(S.dens / 10)); for (i = 0; i < n; i++) br(x0 + sz * (i + 0.5) / n, y0 + sz * 0.95, -Math.PI / 2 + (rnd() - 0.5) * 0.5, sz * 0.3, 4);
+    return d;
+  }
+  return d;
+}
+function infCalc() {
+  var n = S.walls, d = S.dens / 100, pf = S.pat === "light" ? 0.25 : 1;
+  var vol = 1440 * n + 2880 + Math.pow(40 - 0.9 * n, 2) * 18.2 * d * pf;
+  var str = (n * 12 + S.dens * 0.6 * PATS[S.pat][2]) / (24 + 9);
+  return { g: vol * 1.24 / 1000, min: vol / 4 / 60 + 3, str: str };
+}
+function infillSVG() {
+  var x0 = 20, y0 = 50, sz = 300, k = sz / 40, w = 0.45 * k, n = S.walls, b = w / Math.max(S.dens / 100, 0.001), s = "";
+  var inset = n * w, ix = x0 + inset - w * 0.15, isz = sz - 2 * inset + w * 0.3;
+  s += '<defs><clipPath id="inClip"><rect x="' + r1(ix) + '" y="' + r1(ix - x0 + y0) + '" width="' + r1(isz) + '" height="' + r1(isz) + '"/></clipPath>' +
+    '<clipPath id="secClip"><rect x="' + 0 + '" y="0" width="1" height="1"/></clipPath></defs>';
+  s += T(x0 + sz / 2, 36, "Cross-section (one layer from above)");
+  s += '<rect x="' + x0 + '" y="' + y0 + '" width="' + sz + '" height="' + sz + '" fill="#E3F4F6" stroke="#424143"/>';
+  if (S.dens > 0) s += '<g data-info="' + PATKEY[S.pat] + '" tabindex="0"><g data-info="in_inf" clip-path="url(#inClip)"><rect x="' + r1(ix) + '" y="' + r1(ix - x0 + y0) + '" width="' + r1(isz) + '" height="' + r1(isz) + '" fill="rgba(0,0,0,.001)"/><path d="' + patternPath(S.pat, ix, ix - x0 + y0, isz, b) + '" fill="none" stroke="#B71F34" stroke-width="' + r1(w * 0.8) + '" stroke-linecap="round" stroke-linejoin="round"/></g></g>';
+  var per = ""; for (var i = 0; i < n; i++) { var o = w * (i + 0.5); per += '<rect x="' + r1(x0 + o) + '" y="' + r1(y0 + o) + '" width="' + r1(sz - 2 * o) + '" height="' + r1(sz - 2 * o) + '" rx="' + r1(o * 0.3) + '"/>'; }
+  s += '<g data-info="in_per" tabindex="0" fill="none" stroke="#F15B29" stroke-width="' + r1(w * 0.85) + '">' + per + "</g>";
+  // side section
+  var sx = 360, sy = 60, sw = 260, sh = 260, kz = sh / 20, kx = sw / 40, ww = n * 0.45 * kx, bot = 4 * 0.2 * kz, topL = 5 * 0.2 * kz;
+  s += T(sx + sw / 2, 36, "Cut in half (side view)");
+  s += '<rect x="' + sx + '" y="' + sy + '" width="' + sw + '" height="' + sh + '" fill="#E3F4F6" stroke="#424143"/>';
+  if (S.dens > 0) {
+    var cb = Math.max(0.45 * kx / (S.dens / 100) * (S.pat === "grid" ? 2 : 1), 3), col = "", x;
+    if (S.pat === "light") { col = "M" + (sx + sw * 0.3) + " " + (sy + sh - bot) + "V" + (sy + topL + 2) + "M" + (sx + sw * 0.7) + " " + (sy + sh - bot) + "V" + (sy + topL + 2) + "M" + (sx + sw * 0.3) + " " + (sy + topL + 30) + "l-30 -28 M" + (sx + sw * 0.3) + " " + (sy + topL + 30) + "l30 -28 M" + (sx + sw * 0.7) + " " + (sy + topL + 30) + "l-30 -28 M" + (sx + sw * 0.7) + " " + (sy + topL + 30) + "l30 -28"; }
+    else for (x = sx + ww + cb / 2; x < sx + sw - ww; x += cb) {
+      if (S.pat === "gyroid" || S.pat === "cubic" || S.pat === "honey") { col += "M" + r1(x) + " " + (sy + topL); for (var yy = sy + topL; yy <= sy + sh - bot; yy += 4) col += "L" + r1(x + cb * 0.3 * Math.sin((yy - sy) / 22)) + " " + yy; }
+      else col += "M" + r1(x) + " " + (sy + topL) + "V" + (sy + sh - bot);
+    }
+    s += '<g data-info="in_inf"><path d="' + col + '" fill="none" stroke="#B71F34" stroke-width="2.2" clip-path="none"/></g>';
+  }
+  s += '<g data-info="in_per"><rect x="' + sx + '" y="' + sy + '" width="' + r1(ww) + '" height="' + sh + '" fill="#F15B29"/><rect x="' + r1(sx + sw - ww) + '" y="' + sy + '" width="' + r1(ww) + '" height="' + sh + '" fill="#F15B29"/></g>';
+  s += '<g data-info="in_top"><rect x="' + sx + '" y="' + sy + '" width="' + sw + '" height="' + r1(topL) + '" fill="#7A3E9D"/></g><g data-info="in_bot"><rect x="' + sx + '" y="' + r1(sy + sh - bot) + '" width="' + sw + '" height="' + r1(bot) + '" fill="#7A3E9D"/></g>';
+  s += '<rect x="' + (sx - 10) + '" y="' + (sy + sh) + '" width="' + (sw + 20) + '" height="8" fill="#3A3536"/>';
+  return '<svg viewBox="0 0 640 362" role="img" aria-label="Infill diagram">' + s + "</svg>";
+}
+function infillBox() {
+  var c = infCalc(), base = (function () { var s0 = S.dens, w0 = S.walls, p0 = S.pat; S.dens = 15; S.walls = 2; S.pat = "grid"; var r = infCalc(); S.dens = s0; S.walls = w0; S.pat = p0; return r; })();
+  var msg;
+  if (S.dens === 0) msg = '<p class="warn">0% = hollow. Top layers will sag into the empty space. Only for vase-mode style prints.</p>';
+  else if (S.pat === "light") msg = '<p class="warn">Lightning saves time and plastic but adds almost no strength — display models only.</p>';
+  else if (S.dens > 30) msg = '<p class="warn">Above 30% is usually wasteful and rarely needed (REEF guide). For strength, add walls instead.</p>';
+  else if (S.dens < 10) msg = '<p class="warn">Under 10%, top surfaces may “pillow” (bumpy, with holes).</p>';
+  else msg = '<p class="ok">Sensible setting.</p>';
+  return '<div class="cards"><div class="card"><span>Filament</span><b>' + r1(c.g) + ' g</b><small>' + (c.g >= base.g ? "+" : "") + Math.round((c.g / base.g - 1) * 100) + '% vs 15%</small></div>' +
+    '<div class="card"><span>Print time</span><b>~' + Math.round(c.min) + " min</b><small>rough estimate</small></div>" +
+    '<div class="card"><span>Strength</span><b>×' + c.str.toFixed(1) + "</b><small>vs 15% grid, 2 walls</small></div></div>" + msg +
+    '<p class="note">Example: a 40 × 40 × 20 mm block in PLA. PrusaSlicer shows the real numbers after slicing.</p>';
+}
+var infill = {
+  stage: function () { return "<h3>Infill · " + PATS[S.pat][0] + " · " + S.dens + "% · " + S.walls + " walls</h3>" + infillSVG(); },
+  legend: function () { return '<span><i class="sw fill" style="background:#F15B29"></i>Walls (perimeters)</span><span><i class="sw fill" style="background:#B71F34"></i>Sparse infill</span><span><i class="sw fill" style="background:#7A3E9D"></i>Solid top / bottom</span>'; },
+  rail: function () {
+    return '<section class="grp"><h2 class="lbl">What is infill?</h2><p style="margin:0">3D prints aren’t solid. PrusaSlicer prints solid <span class="term" data-info="in_per">walls</span> and <span class="term" data-info="in_top">top/bottom layers</span>, and fills the inside with a light pattern — the <b>infill</b>. Less infill = faster and lighter.</p></section>' +
+      '<section class="grp" style="--c:var(--yellow)"><h2 class="lbl">Try it</h2>' + slider("dens", '<span class="term" data-info="in_inf">Density</span>', 0, 100, 5, "%") +
+      '<div class="sub">Pattern</div>' + seg("pat", Object.keys(PATS).map(function (k) { return [k, PATS[k][0], PATS[k][1] > 1 ? PATS[k][1] : 0, PATKEY[k]]; })) +
+      '<div data-min="2"><div class="sub" style="margin-bottom:6px"><span class="term" data-info="in_per">Walls (perimeters)</span></div>' + seg("walls", [[2, "2 (default)"], [3, "3"], [4, "4"], [5, "5"]]) + "</div>" +
+      '<div id="live">' + infillBox() + "</div></section>" +
+      '<section class="grp" style="--c:var(--blue)"><h2 class="lbl">What should I use?</h2><table class="cmp"><tbody>' +
+      '<tr><td>Looks only (aesthetic)</td><td>10%</td><td><button type="button" class="chip" data-go="infill:10:2">Show</button></td></tr>' +
+      '<tr><td>Light to moderate force</td><td>15–20%</td><td><button type="button" class="chip" data-go="infill:20:2">Show</button></td></tr>' +
+      '<tr><td>Lots of force</td><td>30% (and 3–4 walls)</td><td><button type="button" class="chip" data-go="infill:30:4">Show</button></td></tr>' +
+      '<tr><td>Above 30%</td><td>Usually wasteful and rarely needed — ask staff</td><td></td></tr></tbody></table>' +
+      '<p class="note">In PrusaSlicer, the <b>Infill</b> drop-down on the right panel sets density. Pattern and walls are in Print Settings (Normal mode).</p>' +
+      '<p class="note" data-min="3">Walls add strength right at the surface where bending stress is highest, so 4 walls at 20% usually beats 2 walls at 50%, for less plastic.</p></section>';
+  },
+  live: function () { var l = $("live"); if (l) l.innerHTML = infillBox(); }
+};
+
+/* ================= BRIM ================= */
+var BSH = {
+  tower: { n: "Small, tall part", A: 400, P: 80, Pin: 0 },
+  thin: { n: "Long & thin, sharp corners", A: 800, P: 216, Pin: 0 },
+  ring: { n: "Ring with a hole", A: 804, P: 126, Pin: 75 },
+  many: { n: "Lots of tiny parts", A: 302, P: 151, Pin: 0, cnt: 6 }
+};
+function rrPath(cx, cy, w, h, r) { var x = cx - w / 2, y = cy - h / 2; r = Math.min(r, w / 2, h / 2); return "M" + r1(x + r) + " " + r1(y) + "H" + r1(x + w - r) + "A" + r1(r) + " " + r1(r) + " 0 0 1 " + r1(x + w) + " " + r1(y + r) + "V" + r1(y + h - r) + "A" + r1(r) + " " + r1(r) + " 0 0 1 " + r1(x + w - r) + " " + r1(y + h) + "H" + r1(x + r) + "A" + r1(r) + " " + r1(r) + " 0 0 1 " + r1(x) + " " + r1(y + h - r) + "V" + r1(y + r) + "A" + r1(r) + " " + r1(r) + " 0 0 1 " + r1(x + r) + " " + r1(y) + "Z"; }
+function brimSVG() {
+  var sh = S.bshape, on = S.bOn, w = on ? S.bW : 0, sep = S.mode >= 3 ? S.bSep : 0, s = "", cx = 210, cy = 190;
+  var dim = { tower: 20, thin: 100, ring: 40, many: 40 }[sh], k = Math.min(8, 360 / (dim + 20 + 4)), lw = 0.45 * k * 0.8, n = Math.round(w / 0.45);
+  var outer = on && (S.bType === "outer" || S.bType === "both" || S.mode < 2), inner = on && S.mode >= 2 && (S.bType === "inner" || S.bType === "both");
+  var lines = "", partS = "";
+  function rectBrim(x, y, wd, ht) { for (var i = 0; i < n; i++) { var o = sep + 0.225 + i * 0.45; lines += '<path d="' + rrPath(x, y, (wd + 2 * o) * k, (ht + 2 * o) * k, o * k) + '"/>'; } }
+  function circBrim(x, y, r) { for (var i = 0; i < n; i++) { var o = sep + 0.225 + i * 0.45; lines += '<circle cx="' + r1(x) + '" cy="' + r1(y) + '" r="' + r1((r + o) * k) + '"/>'; } }
+  if (sh === "tower") { if (outer) rectBrim(cx, cy, 20, 20); partS = '<rect x="' + r1(cx - 10 * k) + '" y="' + r1(cy - 10 * k) + '" width="' + r1(20 * k) + '" height="' + r1(20 * k) + '"/>'; }
+  if (sh === "thin") { if (outer) rectBrim(cx, cy, 100, 8); partS = '<rect x="' + r1(cx - 50 * k) + '" y="' + r1(cy - 4 * k) + '" width="' + r1(100 * k) + '" height="' + r1(8 * k) + '"/>'; }
+  if (sh === "ring") {
+    if (outer) circBrim(cx, cy, 20);
+    if (inner) for (var i = 0; i < n; i++) { var rr = 12 - sep - 0.225 - i * 0.45; if (rr > 0.3) lines += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r1(rr * k) + '"/>'; }
+    partS = '<path fill-rule="evenodd" d="M' + r1(cx - 20 * k) + " " + cy + "a" + r1(20 * k) + " " + r1(20 * k) + " 0 1 0 " + r1(40 * k) + " 0a" + r1(20 * k) + " " + r1(20 * k) + " 0 1 0 " + r1(-40 * k) + " 0Z M" + r1(cx - 12 * k) + " " + cy + "a" + r1(12 * k) + " " + r1(12 * k) + " 0 1 0 " + r1(24 * k) + " 0a" + r1(12 * k) + " " + r1(12 * k) + " 0 1 0 " + r1(-24 * k) + ' 0Z"/>';
+  }
+  if (sh === "many") [[-12, -6], [0, -6], [12, -6], [-12, 6], [0, 6], [12, 6]].forEach(function (q) { if (outer) circBrim(cx + q[0] * k, cy + q[1] * k, 4); partS += '<circle cx="' + r1(cx + q[0] * k) + '" cy="' + r1(cy + q[1] * k) + '" r="' + r1(4 * k) + '"/>'; });
+  s += '<rect x="10" y="20" width="400" height="340" rx="6" fill="#3A3536"/>' + '<text x="22" y="40" style="font-size:12px;font-weight:700;fill:#E3E6E8">First layer, from above · ' + (n ? n + " brim lines" : "no brim") + "</text>";
+  if (lines) s += '<g data-info="br_brim" tabindex="0" fill="none" stroke="#FCC424" stroke-width="' + r1(lw) + '">' + lines + "</g>";
+  s += '<g data-info="br_part" tabindex="0" fill="#05A7E0" stroke="#010101">' + partS + "</g>";
+  if (inner && sh === "ring") s += '<g data-info="br_inner"><circle cx="' + cx + '" cy="' + cy + '" r="' + r1(11 * k) + '" fill="rgba(0,0,0,.001)"/></g>';
+  // zoomed side detail
+  var zx = 430, zy = 250, kz = 18;
+  s += '<rect x="420" y="20" width="210" height="340" rx="6" style="fill:var(--surface);stroke:var(--line)"/>' + T(525, 44, "Close-up, side view");
+  s += '<rect x="424" y="' + zy + '" width="202" height="14" fill="#3A3536"/>';
+  s += '<g data-info="br_part"><rect x="' + zx + '" y="' + (zy - 150) + '" width="' + 40 + '" height="150" fill="#05A7E0" stroke="#010101"/></g>';
+  if (on && (outer || inner)) {
+    var bl = ""; for (var j = 0; j < n; j++) { var bx = zx + 40 + (sep + j * 0.45) * kz; if (bx + 0.45 * kz > 626) break; bl += '<rect x="' + r1(bx) + '" y="' + (zy - 0.2 * kz) + '" width="' + r1(0.45 * kz - 1) + '" height="' + r1(0.2 * kz) + '" rx="1.5"/>'; }
+    s += '<g data-info="br_layer" fill="#FCC424" stroke="#010101" stroke-width=".6">' + bl + "</g>";
+    s += '<g data-info="br_layer">' + T(530, zy + 40, "1 layer · 0.2 mm thick") + "</g>";
+    if (sep > 0) s += '<g data-info="br_gap"><path d="M' + (zx + 40) + " " + (zy - 20) + " v14 M" + r1(zx + 40 + sep * kz) + " " + (zy - 20) + ' v14" stroke="#B71F34" stroke-width="2"/>' + T(zx + 44, zy - 26, sep + " mm gap", "start") + "</g>";
+  } else s += T(530, zy + 40, "No brim");
+  return '<svg viewBox="0 0 640 375" role="img" aria-label="Brim diagram">' + s + "</svg>";
+}
+function brimBox() {
+  var b = BSH[S.bshape], w = S.bOn ? S.bW : 0, cnt = b.cnt || 1, outer = S.bType !== "inner" || S.mode < 2, inner = S.mode >= 2 && S.bType !== "outer" && b.Pin;
+  var ba = (outer ? b.P * w + cnt * Math.PI * w * w : 0) + (inner ? Math.max(0, Math.min(452, b.Pin * w - Math.PI * w * w)) : 0);
+  return '<div class="cards"><div class="card" data-info="br_part"><span>Part footprint</span><b>' + b.A + '</b><small>mm²</small></div><div class="card" data-info="br_brim"><span>Brim adds</span><b>' + Math.round(ba) + '</b><small>mm²</small></div><div class="card"><span>Total grip</span><b>×' + r1((b.A + ba) / b.A) + "</b><small>vs no brim</small></div></div>" +
+    (S.bshape === "many" && w > 2 ? '<p class="note">Brims of neighbouring parts merge. That holds them well, but space parts out (<kbd>A</kbd> Arrange) so each one is easy to separate.</p>' : "") +
+    (S.bshape !== "ring" && S.mode >= 2 && S.bType === "inner" ? '<p class="warn">This part has no holes, so “inner only” adds nothing.</p>' : "");
+}
+function brimRec() {
+  var y = S.q1 || S.q2 || S.q3;
+  return y ? '<p class="ok"><b>Yes — use a brim.</b> Tick <b>Brim</b> on the right panel in PrusaSlicer.' + (S.q1 ? " Also check the <b>Bed contact</b> tab: re-orienting might be even better." : "") + "</p>"
+           : '<p class="note">If none of these apply, you usually don’t need a brim. It costs a little time and cleanup.</p>';
+}
+var brim = {
+  stage: function () { return "<h3>Brim · " + BSH[S.bshape].n + "</h3>" + brimSVG(); },
+  legend: function () { return '<span><i class="sw fill" style="background:#05A7E0"></i>Part</span><span><i class="sw fill" style="background:#FCC424"></i>Brim lines</span>'; },
+  rail: function () {
+    return '<section class="grp"><h2 class="lbl">Do I need a brim?</h2>' + check("q1", "Small footprint for its height (tall, thin, or round-bottomed)") + check("q2", "Long and thin, or sharp corners that could lift") + check("q3", "Lots of tiny parts (under ~10 mm)") + brimRec() + "</section>" +
+      '<section class="grp" style="--c:var(--yellow)"><h2 class="lbl">Try it</h2>' + seg("bshape", Object.keys(BSH).map(function (k) { return [k, BSH[k].n]; })) +
+      check("bOn", '<span class="term" data-info="br_brim">Brim</span> on') + (S.bOn ? slider("bW", "Brim width", 1, 10, 1, " mm", "br_brim") +
+      '<div data-min="2"><div class="sub" style="margin-bottom:6px">Brim type</div>' + seg("bType", [["outer", "Outer only"], ["inner", "Inner only"], ["both", "Outer and inner"]]) + "</div>" +
+      '<div data-min="3"><div class="sub" style="margin-bottom:6px"><span class="term" data-info="br_gap">Brim separation gap</span></div>' + seg("bSep", [[0, "0 mm"], [0.1, "0.1 mm"], [0.2, "0.2 mm"]]) + "</div>" : "") +
+      '<div id="live">' + brimBox() + "</div></section>" +
+      '<section class="grp" style="--c:var(--blue)"><h2 class="lbl">Taking it off</h2><ul class="plain"><li>Let it cool, lift the sheet off, and flex it — the print pops off. <b>No tools on the sheet.</b></li><li>Peel the brim away from the part with your fingers.</li><li>Off the sheet, trim leftover bits from the part with flush cutters (cut away from yourself).</li><li>Clear every scrap of brim, skirt and purge line off the sheet.</li></ul>' +
+      '<p class="note" data-min="2">PrusaSlicer: Print Settings → Skirt and brim. Ticking <b>Brim</b> on the right panel adds an outer brim of about ' + REEF.brimDefault + ' mm. For very small contact areas, a <b>raft</b> is another option: Print Settings → Support material → Raft.</p></section>';
+  },
+  live: function () { var l = $("live"); if (l) l.innerHTML = brimBox(); }
+};
+/* ================= SUPPORTS ================= */
+var SK = 3, SX0 = 20, SBY = 300, SG = 0.8;
+function sP(x, z) { return r1(SX0 + x * SK) + "," + r1(SBY - z * SK); }
+function supNeed() {
+  var thr = S.mode >= 3 ? S.thr : 45, wedge = S.ang > 90 - thr;
+  var want = { none: [], plate: ["arm", "wedge"], enf: ["arm"], every: ["arm", "wedge", "cap"] }[S.place];
+  return { wedge: wedge, arm: want.indexOf("arm") >= 0, wedgeS: wedge && want.indexOf("wedge") >= 0, cap: want.indexOf("cap") >= 0 };
+}
+function supRegion(xa, xb, z0, top, grid) {
+  var pts = [[xa, z0]], x, cols = "", cap = "";
+  if (grid) { xa -= grid[0]; xb += grid[1]; pts = [[xa, z0]]; }
+  for (x = xa; x <= xb + 1e-6; x += 0.5) pts.push([x, Math.max(z0, top(x))]);
+  pts.push([xb, z0]);
+  for (x = xa + 1; x < xb; x += 2) cols += "M" + sP(x, z0) + "L" + sP(x, Math.max(z0, top(x)));
+  for (x = xa; x < xb; x += 0.5) cap += "M" + sP(x, Math.max(z0, top(x))) + "L" + sP(Math.min(xb, x + 0.5), Math.max(z0, top(Math.min(xb, x + 0.5))));
+  return '<g data-info="su_sup"><polygon points="' + pts.map(function (q) { return sP(q[0], q[1]); }).join(" ") + '" fill="#D7DBDE" stroke="#8A9095"/><path d="' + cols + '" stroke="#5A5F63" stroke-width="2"/><path d="' + cap + '" stroke="#5A5F63" stroke-width="4"/></g>';
+}
+function supTree(xa, xb, z0, top) {
+  var mid = (xa + xb) / 2, n = Math.max(2, Math.round((xb - xa) / 5)), d = "", trunkTop = z0 + (top(mid) - z0) * 0.45;
+  for (var i = 0; i < n; i++) {
+    var tx = xa + (xb - xa) * (i + 0.5) / n, tz = top(tx);
+    d += "M" + sP(mid, trunkTop) + "C" + sP(mid, (trunkTop + tz) / 2) + " " + sP(tx, (trunkTop + tz) / 2 - 2) + " " + sP(tx, tz);
+  }
+  return '<g data-info="su_sup" fill="none" stroke="#9AA0A6" stroke-linecap="round"><path d="M' + sP(mid, z0) + "L" + sP(mid, trunkTop) + '" stroke-width="' + (2.6 * SK) + '"/><path d="' + d + '" stroke-width="' + (1.1 * SK) + '"/></g>';
+}
+function supportsSVG() {
+  var t = Math.tan(S.ang * Math.PI / 180), xr = 112 + 30 * t, N = supNeed(), s = "", st = S.style;
+  function region(xa, xb, z0, top, gr) { return st === "organic" ? supTree(xa, xb, z0, top) : supRegion(xa, xb, z0, top, st === "grid" ? gr : null); }
+  s += '<g data-info="su_bed"><rect x="10" y="' + SBY + '" width="620" height="14" fill="#3A3536"/></g>';
+  // supports
+  if (N.arm) s += region(20.6, 45, 0, function () { return 45 - SG; }, [0, 2]);
+  if (N.wedgeS) s += region(112.4, xr, 0, function (x) { return Math.min(30, (x - 112) / t) - SG; }, [0, 2]);
+  if (N.cap) { s += region(64, 69.4, 36, function () { return 46 - SG; }, [2, 0]); s += region(74.6, 80, 36, function () { return 46 - SG; }, [0, 2]); }
+  // parts
+  var A = [[5, 0], [20, 0], [20, 45], [45, 45], [45, 55], [5, 55]];
+  var B = [[55, 0], [62, 0], [62, 30], [83, 30], [83, 0], [90, 0], [90, 36], [74, 36], [74, 46], [80, 46], [80, 50], [64, 50], [64, 46], [70, 46], [70, 36], [55, 36]];
+  var C = [[100, 0], [112, 0], [xr, 30], [100, 30]];
+  function poly(p, key) { return '<g data-info="' + key + '" tabindex="0"><polygon points="' + p.map(function (q) { return sP(q[0], q[1]); }).join(" ") + '" fill="#05A7E0" stroke="#010101" stroke-width="1.5"/></g>'; }
+  s += poly(A, "su_arm") + poly(B, "su_bridge") + poly(C, "su_wedge");
+  s += '<g data-info="su_cap" tabindex="0"><polygon points="' + [[64, 46], [80, 46], [80, 50], [64, 50]].map(function (q) { return sP(q[0], q[1]); }).join(" ") + '" fill="#05A7E0" stroke="#010101" stroke-width="1.5"/></g>';
+  // overhang edges
+  function edge(a, b, col, key) { return '<g data-info="' + key + '"><path d="M' + sP(a[0], a[1]) + "L" + sP(b[0], b[1]) + '" stroke="' + col + '" stroke-width="5" stroke-linecap="round"/></g>'; }
+  s += edge([20, 45], [45, 45], "#B71F34", "su_arm") + edge([64, 46], [70, 46], "#B71F34", "su_cap") + edge([74, 46], [80, 46], "#B71F34", "su_cap") + edge([62, 30], [83, 30], "#FCC424", "su_bridge") + edge([112, 0], [xr, 30], N.wedge ? "#B71F34" : "#5DBB46", "su_wedge");
+  if (S.place === "enf") s += '<g data-info="su_enf"><rect x="' + r1(SX0 + 20 * SK) + '" y="' + r1(SBY - 47 * SK) + '" width="' + 25 * SK + '" height="' + 2 * SK + '" fill="#05A7E0" opacity=".75" stroke="#010101" stroke-dasharray="3 2"/></g>';
+  // droop where unsupported
+  function droop(d) { return '<path d="' + d + '" fill="none" stroke="#B71F34" stroke-width="2" stroke-dasharray="4 3"/>'; }
+  if (!N.arm) s += '<g data-info="su_arm">' + droop("M" + sP(20, 45) + "Q" + sP(36, 44) + " " + sP(45, 37)) + T(SX0 + 33 * SK, SBY - 33 * SK, "droops!") + "</g>";
+  if (N.wedge && !N.wedgeS) s += '<g data-info="su_wedge">' + droop("M" + sP(112 + 15 * t, 15) + "q 10 4 12 -2 M" + sP(112 + 25 * t, 25) + "q 10 4 12 -2") + T(SX0 + (112 + 20 * t) * SK + 30, SBY - 12 * SK, "curls up", "start") + "</g>";
+  if (!N.cap) s += '<g data-info="su_cap">' + droop("M" + sP(64, 46) + "Q" + sP(66, 44) + " " + sP(68, 42.5) + "M" + sP(80, 46) + "Q" + sP(78, 44) + " " + sP(76, 42.5)) + "</g>";
+  // labels
+  s += '<g data-info="su_arm">' + T(SX0 + 25 * SK, SBY - 62 * SK, "Arm") + '</g><g data-info="su_bridge">' + T(SX0 + 72.5 * SK, SBY - 56 * SK, "Bridge + ledge") + '</g><g data-info="su_wedge">' + T(SX0 + 106 * SK + 12, SBY - 36 * SK, "Slope " + S.ang + "°", "start") + "</g>";
+  // angle guide
+  s += '<path d="M' + sP(112, 0) + "L" + sP(112, 30) + '" stroke="#5A5F63" stroke-dasharray="3 3"/><path d="M' + sP(112, 0) + "L" + sP(142, 30) + '" stroke="#5A5F63" stroke-dasharray="1 3"/>' + '<text x="' + r1(SX0 + 143 * SK) + '" y="' + r1(SBY - 30 * SK) + '" style="font-size:11px;fill:var(--muted)">45°</text>';
+  return '<svg viewBox="0 0 640 330" role="img" aria-label="Supports diagram">' + s + "</svg>";
+}
+var PLACE = {
+  none: `No supports. Fine when nothing hangs in the air — or when you’ve re-oriented so nothing does.`,
+  plate: `Supports only grow up from the bed, never from your model. <b>REEF’s recommended choice</b> when you need supports: easy to remove, no marks on the part.`,
+  enf: `Supports only where you paint them with the Paint-on supports tool <kbd>L</kbd>. Great control, but you must paint every overhang.`,
+  every: `Supports anywhere, including standing on your part. Needed for overhangs above other parts of the model, but leaves marks and is harder to clean up.`
+};
+var STY = {
+  organic: `<b>Organic</b>: tree-like branches. Use less plastic, touch the part at small points and usually snap off cleanly. Great for figures and curvy parts.`,
+  grid: `<b>Grid</b>: a block of straight walls under the whole overhang. Sturdy and predictable, but uses more plastic and can be hard to remove.`,
+  snug: `<b>Snug</b>: like grid, but hugs the shape of the overhang more tightly. Less plastic than grid.`
+};
+function supBox() {
+  var N = supNeed(), row = function (n, ok, txt) { return "<tr><td>" + n + "</td><td>" + (ok ? '<span class="ok" style="padding:2px 8px">' + txt + "</span>" : '<span class="bad" style="padding:2px 8px">' + txt + "</span>") + "</td></tr>"; };
+  return '<table class="cmp"><tbody>' + row("Arm", N.arm, N.arm ? "Supported" : "Droops") + row("Bridge", true, "Prints fine") +
+    row("Slope " + S.ang + "°", !N.wedge || N.wedgeS, !N.wedge ? "No support needed" : N.wedgeS ? "Supported" : "Curls up") +
+    row("Ledge on the bridge", N.cap, N.cap ? "Supported (marks on the deck)" : "Droops") + "</tbody></table>";
+}
+var sup = {
+  stage: function () { return "<h3>Supports · side view · " + { none: "None", plate: "On build plate only", enf: "Enforcers only", every: "Everywhere" }[S.place] + " · " + S.style + "</h3>" + supportsSVG(); },
+  legend: function () { return '<span><i class="sw" style="border-color:#B71F34;border-top-width:4px"></i>Overhang</span><span><i class="sw" style="border-color:#FCC424;border-top-width:4px"></i>Bridge</span><span><i class="sw" style="border-color:#5DBB46;border-top-width:4px"></i>Safe slope</span><span><i class="sw fill" style="background:#9AA0A6"></i>Support</span>'; },
+  rail: function () {
+    return '<section class="grp"><h2 class="lbl">Supports</h2><p class="note" style="margin:0"><b>First ask: can I rotate the part so it doesn’t need any?</b> See the Bed contact tab.</p>' +
+      seg("place", [["none", "None"], ["plate", "Build plate only"], ["enf", "Enforcers only", 2], ["every", "Everywhere"]]) + '<p class="note">' + PLACE[S.place] + "</p>" +
+      '<div class="sub">Style</div>' + seg("style", [["organic", "Organic"], ["grid", "Grid"], ["snug", "Snug", 2]]) + '<p class="note">' + STY[S.style] + '</p><p class="note" data-min="2">Style is in Print Settings → Support material (Normal mode).</p>' +
+      slider("ang", '<span class="term" data-info="su_wedge">Slope lean</span>', 0, 70, 5, "°") + slider("thr", '<span class="term" data-info="su_wedge">Overhang threshold</span>', 30, 70, 5, "°", null, 3) +
+      '<p class="note" data-min="3">PrusaSlicer measures the threshold from the bed (horizontal). Its default 0 means “automatic”, worked out from layer height and line width — close to the 45° rule for PLA.</p>' +
+      '<div id="live">' + supBox() + "</div></section>" +
+      '<section class="grp" style="--c:var(--yellow)"><h2 class="lbl">The 45° rule</h2><p style="margin:0">Each layer can stick out a little past the one below. Up to about <b>45° from vertical</b>, PLA prints fine without support. Flatter than that, it needs support. Short <span class="term" data-info="su_bridge">bridges</span> between two posts are OK.</p></section>' +
+      '<section class="grp" style="--c:var(--blue)"><h2 class="lbl">Removing supports</h2><ul class="plain"><li>Wear safety glasses — support bits can fly.</li><li>Pliers or flush cutters, working away from your hands.</li><li>Organic supports: twist the trunk, it usually pops off in one piece.</li><li data-min="2">Use <span class="term" data-info="su_enf">support blockers</span> (paint tool <kbd>L</kbd>) to keep supports off surfaces that must look good.</li><li data-min="3"><span class="term" data-info="su_gap">Contact Z distance</span> sets how easily they release.</li></ul></section>';
+  },
+  live: function () { var l = $("live"); if (l) l.innerHTML = supBox(); }
+};
+
+/* ================= SLICE & EXPORT ================= */
+var STEPS = [
+  { t: "Presets", s: "MK4S · PLA · 0.20mm STRUCTURAL", b: `Pick the printer, filament and print presets on the right panel.`, i: `Wrong printer preset is the #1 reason a file won’t start on the MK4S.`, e: `Use system presets; if you change settings, PrusaSlicer marks the preset “(modified)”.` },
+  { t: "Import", s: "Drag in STL, 3MF, STEP or OBJ", b: `Drag your file onto the bed, or Add (<kbd>Ctrl</kbd>+<kbd>I</kbd>).`, i: `If it appears tiny, it was probably designed in inches — PrusaSlicer offers to convert it.`, e: `3MF keeps your settings, painted supports and modifiers with the model.` },
+  { t: "Orient", s: "Place on face (F) — big face down", b: `Use <b>Place on face</b> so the largest flat area touches the bed.`, i: `Press <kbd>2</kbd> to view from below. Small contact patch → re-orient, cut, or add a brim.`, e: `Also think about strength: layers split apart easily, so put long thin features flat.` },
+  { t: "Arrange", s: "A — spaced out, on the bed", b: `Press <kbd>A</kbd> to arrange. Every part must be inside the bed outline.`, i: `Leave a gap between parts so the nozzle doesn’t knock neighbours.` },
+  { t: "Settings", s: "Supports · Infill · Brim", b: `Set supports, infill and brim on the right panel.`, i: `Start with supports “build plate only” (if needed), 15% infill, and a brim for small footprints.` },
+  { t: "Slice", s: "Slice now (Ctrl + R)", b: `Click <b>Slice now</b>. PrusaSlicer turns the model into layers.`, i: `Fix any warnings before exporting. Most common: <b>“Low bed adhesion”</b> → tick <b>Brim</b> and slice again.` },
+  { t: "Preview", s: "Check layer 1, supports, time", b: `Drag the layer slider to layer 1. Is there enough touching the bed? Are supports where they should be?`, i: `Check the estimated time and filament in Sliced info. REEF jobs are capped at <b>20 hours</b>.` },
+  { t: "Export", s: "Export .bgcode to USB drive", b: `<b>Export G-code</b> (<kbd>Ctrl</kbd>+<kbd>G</kbd>). Name it with your name and part.`, i: `MK4S files are .bgcode. Then start the print and <b>watch the first layer</b>.`, e: `Save it straight to the USB drive, then use “Eject” in PrusaSlicer (or your computer) before you unplug it.` }
+];
+var CHECKS = [
+  ["Printer preset is the MK4S (0.4 mm nozzle)", 1], ["Filament preset is PLA", 1], ["Biggest flat face is on the bed (Place on face)", 1],
+  ["Brim on if the footprint is small or the part is tall", 1], ["Supports only if needed — build plate only first", 1], ["Preview: checked layer 1 has a good footprint", 1],
+  ["No “Low bed adhesion” warning (or Brim is on)", 1], ["Estimated time is under 20 hours", 1], ["File name has my name in it", 1], ["I’ll watch the first 5 minutes of printing", 1],
+  ["Parts are spaced out (Arrange) and inside the bed", 2], ["Size is right (check the size boxes — not inches!)", 2], 
+  ["No warnings after slicing (empty layers, outside print area)", 3], ["No error icon next to the model in the object list (mesh errors)", 3]
+];
+function flowSVG() {
+  var cols = ["#B71F34", "#FCC424", "#05A7E0", "#7DCFD8"], s = "";
+  STEPS.forEach(function (x, i) {
+    I["wf_" + i] = { t: (i + 1) + ". " + x.t, b: x.b, i: x.i, e: x.e };
+    var row = i < 4 ? 0 : 1, col = i % 4, X0 = 14 + col * 152, Y0 = 30 + row * 150, words = x.s.split(" "), lines = [""];
+    words.forEach(function (w) { if ((lines[lines.length - 1] + " " + w).trim().length > 17) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + " " + w).trim(); });
+    s += '<g data-info="wf_' + i + '" tabindex="0"><rect x="' + X0 + '" y="' + Y0 + '" width="134" height="104" rx="6" style="fill:var(--surface);stroke:var(--line)" stroke-width="1.5"/>' +
+      '<circle cx="' + (X0 + 20) + '" cy="' + (Y0 + 20) + '" r="12" fill="' + cols[i % 4] + '"/><text x="' + (X0 + 20) + '" y="' + (Y0 + 25) + '" text-anchor="middle" style="font-size:13px;font-weight:700;fill:' + (i % 4 ? "#010101" : "#fff") + '">' + (i + 1) + "</text>" +
+      '<text x="' + (X0 + 38) + '" y="' + (Y0 + 25) + '" style="font-size:14px;font-weight:700;fill:var(--fg)">' + x.t + "</text>" +
+      lines.slice(0, 3).map(function (l, j) { return '<text x="' + (X0 + 12) + '" y="' + (Y0 + 54 + j * 16) + '" style="font-size:12px;fill:var(--muted)">' + l + "</text>"; }).join("") + "</g>";
+    if (col < 3) s += '<path d="M' + (X0 + 136) + " " + (Y0 + 52) + ' h12" style="stroke:var(--fg)" stroke-width="2"/><path d="M' + (X0 + 150) + " " + (Y0 + 52) + ' l-7 -5 v10z" style="fill:var(--fg)"/>';
+  });
+  s += '<path d="M' + (14 + 3 * 152 + 67) + ' 136 v14 H81 v14" style="stroke:var(--fg)" stroke-width="2" fill="none"/><path d="M81 172 l-5 -8 h10z" style="fill:var(--fg)"/>';
+  return '<svg viewBox="0 0 620 290" role="img" aria-label="PrusaSlicer workflow">' + s + "</svg>";
+}
+function updateProg() {
+  var boxes = rail.querySelectorAll("[data-chk]"), n = 0, t = 0;
+  boxes.forEach(function (b) { var m = b.closest("[data-min]"); if (m && getComputedStyle(m).display === "none") return; t++; if (b.checked) n++; });
+  var p = $("progBar"), l = $("progLbl"); if (p) p.style.width = (t ? n / t * 100 : 0) + "%"; if (l) l.textContent = n + " / " + t + (n === t && t ? " — ready to print!" : "");
+}
+var DELIVER = {
+  usb: [`Find the printer’s USB drive — it may already be in the printer.`, `Export G-code (<kbd>Ctrl</kbd>+<kbd>G</kbd>) and save the <b>.bgcode</b> file to the USB drive.`, `In the pop-up, click the <b>eject ▲</b> icon, then unplug the drive.`, `Plug it into the <b>USB port on the right</b> of the printer. Turn the knob to your file and press to start.`, `Watch the purge line and <b>the first 5 minutes of printing</b>. See the <b>At the printer</b> tab.`]
+};
+var exportV = {
+  stage: function () { return "<h3>From model to printer · hover each step</h3>" + flowSVG(); },
+  legend: function () { return "<span>Hover a step for details. Use the checklist before every print.</span>"; },
+  rail: function () {
+    return '<section class="grp"><h2 class="lbl">Getting it to the printer</h2>' + '<p class="note" style="margin:0">REEF printers take files on a <b>USB drive</b> only.</p>' +
+      '<ol class="plain" style="padding-left:20px;margin:0">' + DELIVER[S.flow].map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ol>" +
+      "</section>" +
+      '<section class="grp" style="--c:var(--yellow)"><h2 class="lbl">Before you export</h2><div class="prog"><i id="progBar"></i></div><p class="note" id="progLbl"></p><div class="checks">' +
+      CHECKS.map(function (c, i) { return '<label class="chk" data-min="' + c[1] + '"><input type="checkbox" data-chk="c' + i + '"' + (S.checks["c" + i] ? " checked" : "") + "> " + c[0] + "</label>"; }).join("") + "</div></section>" +
+      '<section class="grp" style="--c:var(--red)"><h2 class="lbl">Avoidable mistakes</h2><table class="cmp"><tbody>' +
+      '<tr><td>Tiny contact patch</td><td>Place on face <kbd>F</kbd>, re-orient, or brim. Loose parts cause clogs.</td></tr>' +
+      '<tr><td>Wrong printer</td><td>Re-slice with the MK4S preset.</td></tr>' +
+      '<tr><td>Supports everywhere</td><td>Re-orient first; then build plate only.</td></tr>' +
+      '<tr><td>100% infill</td><td>15–20% is plenty for most parts.</td></tr>' +
+      '<tr><td>Walking away</td><td>Watch the first 5 minutes — most failures show up there.</td></tr><tr><td>“Low bed adhesion” warning</td><td>Tick Brim and slice again.</td></tr><tr><td>Over 20 hours</td><td>Scale down, lower infill, or split the job — 20-hour cap.</td></tr>' +
+      '<tr data-min="2"><td>Tiny model</td><td>Designed in inches: accept the inch conversion or scale 2540%.</td></tr></tbody></table></section>';
+  },
+  after: updateProg
+};
+/* ================= AT THE PRINTER (REEF policy + work instruction) ================= */
+var PHASES = {
+  before: { n: "Before", hl: ["pr_sheet", "pr_pins"], s: [
+    "Pick a free printer — first come, first served (no reservations). <b>One machine per person.</b>",
+    "Lift the steel sheet off (it’s magnetic). <b>Wash it with dish soap, water and a paper towel</b>, then dry <b>both</b> sides.",
+    "Put it back: line the back edge up with the <b>two pins</b>, and make sure it lies flat with no PLA stuck underneath.",
+    "<b>No glue, ever.</b> A clean sheet holds PLA on its own." ] },
+  start: { n: "Start", hl: ["pr_usb", "pr_knob"], s: [
+    "Find the printer’s USB drive (it may already be in the printer).",
+    "In PrusaSlicer, <b>Export G-code</b> to the USB drive. In the pop-up, click the <b>eject ▲</b> icon before you pull the drive out.",
+    "Plug the drive into the <b>USB port on the right</b> of the printer.",
+    "Turn the <b>knob</b> to your file and press it to start." ] },
+  watch: { n: "Watch", hl: ["pr_nozzle", "pr_purge", "pr_print"], s: [
+    "The nozzle and bed heat up for PLA, then the printer calibrates (probes the bed).",
+    "It draws a <b>purge line</b> across the front. <b>No plastic coming out?</b> Press the knob → <b>Pause print</b> and tell staff — the nozzle may be clogged.",
+    "<b>Watch the first 5 minutes of actual printing</b> before you leave. Most failures happen on the first layer.",
+    "Check back on long prints. Jobs are capped at <b>20 hours</b>." ] },
+  after: { n: "After", hl: ["pr_sheet", "pr_print"], s: [
+    "Let the print cool for a few minutes.",
+    "Pinch the front corners and lift the sheet off. <b>Flex it</b> to pop the part free — a fingernail for small parts. <b>No tools on the sheet</b>; they damage it.",
+    "Remove the purge line, skirt and every leftover bit of plastic.",
+    "Wash the sheet (soap, water, paper towel), dry both sides, and seat it back on the pins.",
+    "<b>Label your print</b> with a REEF label.",
+    "Failed and you don’t know why? <b>Talk to staff before printing again.</b>" ] }
+};
+var POLICY = [
+  ["20-hour cap", "on individual print jobs."], ["Only one machine", "per person."],
+  ["Failed print and don’t know why?", "Speak with a staff member before printing again."], ["Watch the first 5 minutes", "of your print job before leaving."],
+  ["Label your print.", ""], ["Wash the print bed", "with soap, water, and a paper towel."]
+];
+Object.assign(I, {
+  pr_nozzle: { t: `Nozzle (hot!)`, tag: `over 200 °C`, b: `Plastic comes out here at over 200 °C (about 400 °F). Never touch it.`,
+    i: `A nozzle covered in plastic can snag the print or stop extruding. Tell staff — only staff do maintenance.` },
+  pr_ext: { t: `Extruder`, b: `Pushes filament into the hot nozzle. It moves side to side (X).`, i: `Keep hands clear while it moves.` },
+  pr_x: { t: `X axis`, b: `The extruder slides left and right along this.` },
+  pr_frame: { t: `Frame`, b: `Holds everything square. The extruder moves up (Z) as the print grows.` },
+  pr_bed: { t: `Heated bed`, b: `Moves <b>front to back</b> (Y). Don’t put hands or parts where they could get pinched.`, i: `It heats to about 60 °C for PLA.` },
+  pr_sheet: { t: `Steel print sheet`, b: `Magnetic and removable. Wash it with <b>dish soap and water</b>, dry both sides. <b>No glue.</b>`,
+    i: `Fingerprints and dust stop PLA sticking. Alcohol wipes are OK but don’t clean as well as soap and water.`, e: `Never scrape it with tools — damaged sheets have to be replaced.` },
+  pr_pins: { t: `Alignment pins`, b: `The back edge of the sheet sits against these two pins. Make sure it’s flat with nothing underneath.` },
+  pr_usb: { t: `USB port`, tag: `right side`, b: `Your print goes in on a USB drive. Eject it in PrusaSlicer before unplugging it from the computer.` },
+  pr_knob: { t: `Screen & knob`, b: `Turn to scroll, press to select. Press during a print for the menu — <b>Pause print</b> is there.` },
+  pr_spool: { t: `Filament spools`, tag: `2 loaded`, b: `Two PLA spools sit on the holder on top. You can swap or reload filament yourself: on the printer, choose <b>Filament</b> → Unload, change spools, then Load. REEF provides PLA free — don’t bring your own without staff permission.` },
+  pr_purge: { t: `Purge line`, b: `Before every print the printer draws a line at the front to prime the nozzle. No line = possible clog: pause and tell staff.` },
+  pr_print: { t: `Your print`, b: `Watch the first 5 minutes. When it’s done, let it cool, flex the sheet, and label it.` }
+});
+PHOTO_KEYS.pr_sheet = `Photo: sheet being washed at the sink`; PHOTO_KEYS.pr_purge = `Photo: a good purge line and first layer`; PHOTO_KEYS.pr_knob = `Photo: printer screen with Pause print`;
+Object.assign(I, {
+  pr_knob: { t: `Rotary knob`, b: `Turn to scroll, press to select. Press it during a print to open the menu — <b>Pause print</b> is there.` },
+  pr_screen: { t: `Touchscreen`, b: `Home menu: <b>Print</b> (pick your file from the USB drive), Preheat, Filament, Control, Settings and Info. Tap an icon or use the knob.`,
+    i: `During a print it shows progress, time remaining and temperatures. Use <b>Filament</b> to unload, load or swap spools. Leave Control and Settings to staff.` },
+  pr_footer: { t: `Footer`, b: `Live status: nozzle temperature, bed temperature, loaded filament, fan and more.`,
+    i: `For PLA, the nozzle heats to about 215 °C and the bed to about 60 °C before printing starts.` },
+  pr_reset: { t: `Reset button`, b: `Restarts the printer and <b>cancels any print in progress</b>. Don’t press it — ask staff if something seems stuck.` },
+  pr_drive: { t: `USB drive`, b: `Your .bgcode file goes on this. It plugs in on the right of the screen.` }
+});
+var GZ0 = 26; // nozzle tip to sheet surface, at rest (px)
+function printerSVG() {
+  var hl = PHASES[S.phase].hl, s = "", ph = S.phase;
+  function g(k, inner, extra) { return '<g data-info="' + k + '" tabindex="0"' + (hl.indexOf(k) >= 0 ? ' class="hl"' : "") + (extra || "") + ">" + inner + "</g>"; }
+  function spool(x, col, edge) {
+    return '<rect x="' + x + '" y="22" width="8" height="96" rx="3" fill="#231F20"/><rect x="' + (x + 8) + '" y="30" width="48" height="80" fill="' + col + '"/>' +
+      [0, 1, 2, 3, 4, 5].map(function (i) { return '<line x1="' + (x + 8) + '" y1="' + (36 + i * 13) + '" x2="' + (x + 56) + '" y2="' + (36 + i * 13) + '" stroke="' + edge + '" stroke-opacity=".5"/>'; }).join("") +
+      '<rect x="' + (x + 56) + '" y="22" width="8" height="96" rx="3" fill="#231F20"/>';
+  }
+  s += '<defs><pattern id="lyr" width="6" height="2.6" patternUnits="userSpaceOnUse"><rect width="6" height="2.6" fill="#05A7E0"/><rect y="2" width="6" height=".6" fill="#0386B4"/></pattern></defs>';
+  s += '<ellipse cx="320" cy="430" rx="230" ry="8" style="fill:rgba(0,0,0,.1)"/>';
+  s += g("pr_spool", '<rect x="246" y="66" width="148" height="6" fill="#424143"/>' + spool(250, "#F15B29", "#B71F34") + spool(326, "#3A3536", "#000") + '<rect x="310" y="110" width="20" height="34" fill="#231F20"/>');
+  s += '<line id="fil" x1="296" y1="110" x2="296" y2="196" stroke="#F15B29" stroke-width="2"/>';
+  s += g("pr_frame", '<rect x="128" y="138" width="12" height="282" fill="#8A9095"/><rect x="500" y="138" width="12" height="282" fill="#8A9095"/>' +
+    '<path fill-rule="evenodd" fill="#231F20" d="M140 140 H500 V330 H140 Z M168 164 H472 V330 H168 Z"/>' +
+    '<line x1="182" y1="164" x2="182" y2="320" stroke="#B5BBC0" stroke-width="3"/><line x1="458" y1="164" x2="458" y2="320" stroke="#B5BBC0" stroke-width="3"/>' +
+    '<rect x="476" y="176" width="14" height="22" rx="1" fill="#05A7E0"/><rect x="476" y="202" width="14" height="30" rx="1" fill="#E3E6E8"/>');
+  // bed + sheet
+  s += g("pr_bed", '<rect x="150" y="332" width="340" height="10" fill="#424143"/><text x="320" y="341" text-anchor="middle" style="font-size:8px;fill:#B5BBC0;font-weight:700">↕ moves front / back</text>');
+  s += g("pr_sheet", '<polygon points="178,312 462,312 474,332 166,332" fill="#3A3536" stroke="#8A9095"/><text x="186" y="328" style="font-size:7px;font-weight:700;fill:#F15B29">PRUSA</text>');
+  s += g("pr_pins", '<circle cx="186" cy="313" r="3.5" fill="#B5BBC0" stroke="#231F20"/><circle cx="454" cy="313" r="3.5" fill="#B5BBC0" stroke="#231F20"/>');
+  // static phase drawing (hidden while the animation runs)
+  var st = "";
+  if (ph !== "before") {
+    if (ph === "watch") st += g("pr_purge", '<path d="M190 316 H300" stroke="#F15B29" stroke-width="3" stroke-linecap="round"/>');
+    st += g("pr_print", '<rect x="300" y="' + (ph === "watch" ? 304 : 282) + '" width="40" height="' + (ph === "watch" ? 8 : 30) + '" fill="url(#lyr)" stroke="#010101"/>' + (ph === "after" ? '<rect x="302" y="266" width="38" height="13" rx="2" fill="#fff" stroke="#010101"/><text x="321" y="276" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#010101">J. Doe</text>' : ""));
+  }
+  s += '<g id="staticPrint">' + st + "</g>";
+  // animation layers
+  s += '<g id="anim" style="display:none">' + g("pr_purge", '<path id="anPurge" d="M190 316 H190" stroke="#F15B29" stroke-width="3" stroke-linecap="round"/>') +
+    g("pr_print", '<rect id="anPart" x="300" y="312" width="40" height="0" fill="url(#lyr)" stroke="#010101" stroke-width=".8"/>') +
+    '<g id="probe" style="display:none"><circle id="probeDot" cx="0" cy="312" r="5" fill="none" stroke="#FCC424" stroke-width="2"/></g></g>';
+  // gantry (moves in Z) with extruder (moves in X)
+  s += '<g id="gantry">' + g("pr_x", '<rect x="140" y="224" width="360" height="5" fill="#B5BBC0"/><rect x="140" y="248" width="360" height="5" fill="#B5BBC0"/>' +
+    '<rect x="122" y="212" width="46" height="52" rx="4" fill="#F15B29" stroke="#231F20"/><rect x="472" y="212" width="46" height="52" rx="4" fill="#F15B29" stroke="#231F20"/><circle cx="134" cy="238" r="6" fill="#231F20"/>') +
+    '<g id="exg">' + g("pr_ext", '<path id="cable" d="M290 236 C 230 236, 200 260, 196 300" stroke="#231F20" stroke-width="7" fill="none" stroke-linecap="round"/>' +
+    '<rect x="290" y="192" width="62" height="78" rx="6" fill="#231F20" stroke="#424143"/><text x="321" y="210" text-anchor="middle" style="font-size:7px;font-weight:700;fill:#B5BBC0">ORIGINAL</text>' +
+    '<text x="321" y="222" text-anchor="middle" style="font-size:11px;font-weight:700;fill:#fff">PRUSA</text><text x="321" y="234" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#F15B29">MK4S</text>' +
+    '<g id="fan"><circle cx="321" cy="252" r="11" fill="#3A3536" stroke="#5A5556"/><path d="M314 252 h14 M321 245 v14" stroke="#8A9095"/></g>') +
+    g("pr_nozzle", '<polygon id="noz" points="313,270 329,270 324,286 318,286" fill="#FCC424" stroke="#B71F34" stroke-width="2"/>') + "</g></g>";
+  // front base (simplified — the close-up below shows the real panel)
+  s += '<path d="M160 344 H480 L470 412 H170 Z" fill="#231F20"/>';
+  s += g("pr_screen", '<rect x="262" y="352" width="92" height="48" rx="3" fill="#010101" stroke="#5A5556"/><rect x="266" y="355" width="84" height="40" fill="#1A1718"/><text id="miniScr" x="308" y="379" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#fff">HOME</text>');
+  s += g("pr_knob", '<circle cx="380" cy="368" r="10" fill="#3A3536" stroke="#8A9095" stroke-width="2"/>') + g("pr_reset", '<circle cx="380" cy="394" r="6" fill="#B71F34"/>');
+  s += g("pr_usb", '<rect x="398" y="362" width="7" height="10" fill="#8A9095" stroke="#010101"/>' + (ph !== "before" ? '<rect id="drive" x="405" y="363" width="22" height="8" rx="1" fill="#010101" stroke="#8A9095"/>' : ""));
+  s += '<g data-info="pr_spool">' + T(420, 60, "2 PLA spools", "start") + "</g>";
+  return '<svg viewBox="0 0 640 440" role="img" aria-label="Prusa MK4S printer, front view (schematic)">' + s + "</svg>";
+}
+/* close-up of the front panel, modelled on the MK4S touchscreen */
+function scrContent(m) {
+  var s = '<text x="132" y="38" style="font-size:10px;fill:#fff;font-family:var(--f-mono)">⌂ ' + (m.mode === "home" ? "HOME" : "PRINTING") + '</text><text x="428" y="38" text-anchor="end" style="font-size:10px;fill:#fff;font-family:var(--f-mono)">⌁ ▭ 16:00</text>';
+  if (m.mode === "home") {
+    [["Print", "▶", 1], ["Preheat", "♨"], ["Filament", "◉"], ["Control", "⊕"], ["Settings", "⚙"], ["Info", "ⓘ"]].forEach(function (t, i) {
+      var x = 182 + (i % 3) * 82, y = 46 + Math.floor(i / 3) * 46;
+      s += '<rect x="' + (x - 16) + '" y="' + y + '" width="32" height="28" rx="4" fill="' + (t[2] ? "#fff" : "#5A5556") + '"/><text x="' + x + '" y="' + (y + 20) + '" text-anchor="middle" style="font-size:15px;fill:#F15B29">' + t[1] + '</text><text x="' + x + '" y="' + (y + 38) + '" text-anchor="middle" style="font-size:8.5px;fill:#fff;font-family:var(--f-mono)">' + t[0] + "</text>";
+    });
+  } else {
+    s += '<text x="280" y="62" text-anchor="middle" style="font-size:11px;fill:#B5BBC0;font-family:var(--f-mono)">part.bgcode</text>' +
+      '<text x="280" y="88" text-anchor="middle" style="font-size:15px;font-weight:700;fill:' + (m.warn ? "#FCC424" : "#fff") + ';font-family:var(--f-mono)">' + m.status + "</text>" +
+      '<rect x="160" y="100" width="240" height="8" rx="4" fill="#3A3536"/><rect x="160" y="100" width="' + r1(240 * m.pct / 100) + '" height="8" rx="4" fill="#F15B29"/>' +
+      '<text x="160" y="124" style="font-size:10px;fill:#fff;font-family:var(--f-mono)">' + Math.floor(m.pct) + '%</text><text x="400" y="124" text-anchor="end" style="font-size:10px;fill:#B5BBC0;font-family:var(--f-mono)">' + m.rem + "</text>";
+  }
+  s += '<g data-info="pr_footer"><rect x="124" y="140" width="312" height="22" rx="3" fill="#010101" stroke="#F15B29" stroke-width="1.5"/>' +
+    [["⌄ " + Math.round(m.noz) + "°C", 136], ["♨ " + Math.round(m.bed) + "°C", 196], ["◉ " + (m.mode === "home" ? "---" : "PLA"), 258], ["✣ " + m.fan, 318], ["Z " + m.z, 380]].map(function (f) { return '<text x="' + f[1] + '" y="155" style="font-size:9px;fill:#fff;font-family:var(--f-mono)">' + f[0] + "</text>"; }).join("") + "</g>";
+  return s;
+}
+function screenSVG() {
+  var usbIn = S.phase !== "before" || AN.t > 0;
+  return '<svg viewBox="0 0 640 186" role="img" aria-label="MK4S front panel close-up">' +
+    '<rect x="20" y="8" width="560" height="170" rx="10" fill="#231F20"/>' +
+    '<text transform="translate(94,93) rotate(-90)" text-anchor="middle" textLength="128" lengthAdjust="spacingAndGlyphs" style="font-size:17px;font-weight:900;fill:#fff;font-family:var(--f-display)">PRUSA <tspan fill="#F15B29">MK4S</tspan></text>' +
+    '<g data-info="pr_screen" tabindex="0"><rect x="116" y="20" width="328" height="150" rx="4" fill="#010101" stroke="#3A3536"/><g id="scr">' + scrContent(screenState()) + "</g></g>" +
+    '<g data-info="pr_knob" tabindex="0"><circle cx="500" cy="82" r="26" fill="#2B2829" stroke="#010101" stroke-width="3"/><path d="M500 60 v8" stroke="#5A5556" stroke-width="3"/></g>' +
+    '<g data-info="pr_reset" tabindex="0"><polygon points="490,128 500,128 507,135 507,145 500,152 490,152 483,145 483,135" fill="#231F20" stroke="#B71F34" stroke-width="2.5"/><text x="495" y="143" text-anchor="middle" style="font-size:6.5px;font-weight:700;fill:#fff">RESET</text></g>' +
+    '<g data-info="pr_usb" tabindex="0"><text x="548" y="46" text-anchor="middle" style="font-size:13px;fill:#fff">⭠</text><rect x="562" y="34" width="18" height="16" fill="#3A3536"/></g>' +
+    (usbIn ? '<g data-info="pr_drive" tabindex="0"><rect x="566" y="31" width="64" height="22" rx="2" fill="#010101" stroke="#5A5556"/><text x="598" y="46" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#fff">USB</text></g>' : "") +
+    "</svg>";
+}
+/* ---------- print animation ---------- */
+var AN = { on: false, t: 0, sp: 1, raf: 0, t0: 0 };
+var TL = { heat: 5, cal: 10, purge: 12.5, print: 30, done: 32 }, LAYERS = 12, PX0 = 300, PX1 = 340;
+function screenState() {
+  var t = AN.t, m = { mode: "home", noz: 31, bed: 31, fan: "OFF", z: "---", pct: 0, rem: "", status: "" };
+  if (t <= 0) {
+    if (S.phase === "watch") return { mode: "print", noz: 215, bed: 60, fan: "100%", z: "0.4", pct: 3, rem: "52m left", status: "Printing" };
+    if (S.phase === "after") return { mode: "print", noz: 40, bed: 35, fan: "OFF", z: "6.0", pct: 100, rem: "Done", status: "Print finished" };
+    return m;
+  }
+  var pct = t < TL.purge ? 0 : Math.min(100, (t - TL.purge) / (TL.print - TL.purge) * 100);
+  m.mode = "print"; m.pct = pct; m.rem = t >= TL.print ? "Done" : Math.max(1, Math.round(52 * (1 - pct / 100))) + "m left";
+  m.noz = t < TL.heat ? 31 + (215 - 31) * t / TL.heat : t >= TL.print ? 215 - (t - TL.print) * 60 : 215;
+  m.bed = t < TL.heat ? 31 + (60 - 31) * Math.min(1, t / (TL.heat * 0.8)) : 60;
+  m.fan = t > TL.purge && t < TL.print ? "100%" : "OFF";
+  m.status = t < TL.heat ? "Heating…" : t < TL.cal ? "Calibrating…" : t < TL.purge ? "Purging…" : t < TL.print ? "Printing" : "Print finished";
+  m.warn = t < TL.cal;
+  m.z = t < TL.purge ? "---" : (Math.min(LAYERS, Math.ceil((t - TL.purge) / ((TL.print - TL.purge) / LAYERS))) * 0.5).toFixed(1);
+  return m;
+}
+var CAPS = [
+  [TL.heat, "<b>Heating.</b> The nozzle heats to about 215 °C and the bed to about 60 °C for PLA. Watch the footer temperatures climb."],
+  [TL.cal, "<b>Calibrating.</b> The nozzle taps the sheet in several spots to measure it — that’s why the sheet must be clean and seated flat on the pins."],
+  [TL.purge, "<b>Purge line.</b> The printer squeezes out a line at the front to prime the nozzle. <b>No plastic coming out? Pause and tell staff.</b>"],
+  [TL.purge + 4, "<b>First layer.</b> This is where most prints fail. <b>Stay and watch the first 5 minutes</b>: the lines should be flat and stuck down."],
+  [TL.print, "<b>Printing.</b> The extruder moves left–right (X), the bed moves front–back (Y), and the whole X axis rises one layer at a time (Z)."],
+  [TL.done + 1, "<b>Finished.</b> Let it cool, lift the sheet, flex it to pop the part off, clean the sheet, and <b>label your print</b>."]
+];
+function anFrame() {
+  var t = AN.t, dx = 0, dy = 0, h = 0, purgeX = 190, probe = null;
+  if (t <= 0) { var a = $("anim"), sp = $("staticPrint"); if (a) a.style.display = "none"; if (sp) sp.style.display = ""; }
+  else { $("anim").style.display = ""; $("staticPrint").style.display = "none"; }
+  if (t > 0 && t < TL.heat) { dy = -6; }
+  else if (t >= TL.heat && t < TL.cal) {
+    var pts = [-120, -40, 40, 120], u = (t - TL.heat) / (TL.cal - TL.heat) * pts.length, k = Math.min(pts.length - 1, Math.floor(u)), f = u - k;
+    dx = pts[k]; dy = GZ0 * Math.sin(Math.PI * Math.min(1, f * 1.3)); if (f > 0.25 && f < 0.6) probe = 321 + dx;
+  } else if (t >= TL.cal && t < TL.purge) {
+    var f2 = (t - TL.cal) / (TL.purge - TL.cal); dy = GZ0 + 3; dx = -131 + 110 * f2; purgeX = 190 + 110 * f2;
+  } else if (t >= TL.purge && t < TL.print) {
+    purgeX = 300; var lt = (TL.print - TL.purge) / LAYERS, li = Math.floor((t - TL.purge) / lt), lf = ((t - TL.purge) % lt) / lt;
+    h = li * 2.6 + 2.6 * lf; var dir = li % 2 ? -1 : 1, xx = PX0 + 1 + (PX1 - PX0 - 2) * (dir > 0 ? (lf * 2 % 1) : 1 - (lf * 2 % 1));
+    dx = xx - 321; dy = GZ0 - li * 2.6 - 2.6;
+  } else if (t >= TL.print) { purgeX = 300; h = LAYERS * 2.6; dy = GZ0 - h - 20 * Math.min(1, (t - TL.print)); dx = 0; }
+  var gz = $("gantry"), ex = $("exg"); if (!gz) return;
+  gz.setAttribute("transform", "translate(0," + r1(dy) + ")"); ex.setAttribute("transform", "translate(" + r1(dx) + ",0)");
+  $("fil").setAttribute("x2", r1(296 + dx)); $("fil").setAttribute("y2", r1(196 + dy));
+  $("anPurge").setAttribute("d", "M190 316 H" + r1(purgeX));
+  $("anPart").setAttribute("height", r1(h)); $("anPart").setAttribute("y", r1(312 - h));
+  $("noz").setAttribute("fill", t > TL.heat * 0.6 && t < TL.print + 1 ? "#B71F34" : "#FCC424");
+  $("probe").style.display = probe ? "" : "none"; if (probe) $("probeDot").setAttribute("cx", r1(probe));
+  var fan = $("fan"); if (fan) fan.setAttribute("transform", t > TL.purge && t < TL.print ? "rotate(" + Math.round(t * 720 % 360) + " 321 252)" : "");
+  var m = screenState(), sc = $("scr"); if (sc) sc.innerHTML = scrContent(m);
+  var mini = $("miniScr"); if (mini) mini.textContent = m.mode === "home" ? "HOME" : Math.floor(m.pct) + "%";
+  var cap = $("anCap"); if (cap) { var c = "Press <b>▶ Play</b> to watch a print from start to finish."; if (t > 0) for (var i = 0; i < CAPS.length; i++) if (t < CAPS[i][0]) { c = CAPS[i][1]; break; } if (cap.innerHTML !== c) cap.innerHTML = c; }
+  var pb = $("anProg"); if (pb) pb.style.width = Math.min(100, t / TL.done * 100) + "%";
+}
+function anStep(ts) {
+  if (!AN.on) return;
+  if (!$("gantry")) { AN.on = false; return; }
+  var dt = Math.min(0.05, (ts - (AN.t0 || ts)) / 1000); AN.t0 = ts;
+  AN.t = Math.min(TL.done, AN.t + dt * AN.sp); anFrame();
+  if (AN.t >= TL.done) { AN.on = false; var b = $("anPlay"); if (b) b.textContent = "↺ Replay"; return; }
+  AN.raf = requestAnimationFrame(anStep);
+}
+function anPlay() {
+  var b = $("anPlay");
+  if (AN.on) { AN.on = false; cancelAnimationFrame(AN.raf); b.textContent = "▶ Play"; return; }
+  if (AN.t >= TL.done) AN.t = 0;
+  if (AN.t === 0) AN.t = 0.001;
+  AN.on = true; AN.t0 = 0; b.textContent = "❚❚ Pause"; AN.raf = requestAnimationFrame(anStep);
+}
+function anReset() { AN.on = false; cancelAnimationFrame(AN.raf); AN.t = 0; var b = $("anPlay"); if (b) b.textContent = "▶ Play"; anFrame(); }
+var printer = {
+  stage: function () { return "<h3>Prusa MK4S, front view · schematic</h3>" + printerSVG() + "<h3>Front panel close-up</h3>" + screenSVG(); },
+  legend: function () { return '<span>' + hex("#FCC424", 14) + "Glowing parts matter for the selected step · hover anything</span>"; },
+  rail: function () {
+    var ph = PHASES[S.phase];
+    return '<section class="grp" style="--c:var(--aqua)"><h2 class="lbl">Watch a print</h2><div class="row"><button type="button" class="btn pri" id="anPlay">' + (AN.on ? "❚❚ Pause" : AN.t >= TL.done ? "↺ Replay" : "▶ Play") + '</button><button type="button" class="btn sec" id="anRst">↺ Reset</button>' +
+      '<div class="seg" role="group" aria-label="Animation speed" id="anSpeed">' + [[1, "1×"], [2, "2×"], [4, "4×"]].map(function (o) { return '<button type="button" data-sp="' + o[0] + '" aria-pressed="' + (AN.sp === o[0]) + '">' + o[1] + "</button>"; }).join("") + "</div></div>" +
+      '<div class="prog" aria-hidden="true"><i id="anProg"></i></div><p class="note" id="anCap" aria-live="polite" style="min-height:3.6em;color:var(--fg);font-size:14px"></p></section>' +
+      '<section class="grp"><h2 class="lbl">At the printer</h2>' + seg("phase", Object.keys(PHASES).map(function (k, i) { return [k, (i + 1) + ". " + PHASES[k].n]; })) +
+      '<div class="checks">' + ph.s.map(function (x, i) { var id = "p" + S.phase + i; return '<label class="chk"><input type="checkbox" data-chk="' + id + '"' + (S.checks[id] ? " checked" : "") + "> <span>" + x + "</span></label>"; }).join("") + "</div></section>" +
+      '<section class="grp" style="--c:var(--red)"><h2 class="lbl">REEF 3D printing policy</h2><ol class="plain" style="padding-left:20px;margin:0">' +
+      POLICY.map(function (p) { return "<li><b>" + p[0] + "</b> " + p[1] + "</li>"; }).join("") + "</ol>" +
+      '<p class="note">The REEF Makerspace and its staff are not responsible for the success of any prints. It is advisable to check in on long prints. Policies are subject to change. Staff reserve the right to cancel a print at their own discretion.</p>' + '<p class="lnk" style="margin:0"><a href="' + REEF.guide + '" target="_blank" rel="noopener">Read the full REEF FDM 3D Printing Guide (MK4S) ↗</a></p>' + '</section>' +
+      '<section class="grp" style="--c:var(--yellow)"><h2 class="lbl">Also</h2><ul class="plain">' +
+      "<li><b>No glue</b> on the print sheets — it ruins them.</li><li><b>PLA is free.</b> Don’t bring your own filament without staff permission.</li>" +
+      "<li><b>You can swap or reload filament</b> using the Filament menu on the printer.</li><li><b>Don’t fix printers yourself.</b> Tell staff about clogs or other problems.</li><li><b>Never press Reset</b> during a print — it cancels the job.</li><li><b>No reservations.</b> If all printers are full, you may move a <i>finished</i> print to the bin by the 3D printer computer.</li>" +
+      "<li><b>No food or drink</b> (sealed bottles OK).</li><li>Mind the <span class=\"term\" data-info=\"pr_nozzle\">hot nozzle</span> and <span class=\"term\" data-info=\"pr_bed\">moving bed</span>.</li></ul></section>";
+  },
+  after: function () {
+    $("anPlay").onclick = anPlay; $("anRst").onclick = anReset;
+    $("anSpeed").onclick = function (e) { var b = e.target.closest("[data-sp]"); if (!b) return; AN.sp = +b.getAttribute("data-sp"); this.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", x === b); }); };
+    anFrame();
+    if (AN.on) { AN.t0 = 0; cancelAnimationFrame(AN.raf); AN.raf = requestAnimationFrame(anStep); }
+  }
+};
+
+/* ---------------- render ---------------- */
+var VIEWS = { ui: ui, orient: orient, infill: infill, brim: brim, sup: sup, "export": exportV, printer: printer };
+var EMPTY = { ui: "part of the PrusaSlicer window", orient: "the part, the red contact patch, or the footprint", infill: "the walls or infill", brim: "the brim or part", sup: "an overhang, bridge or support", "export": "a workflow step", printer: "a part of the printer" };
+function render() {
+  document.querySelectorAll("#tabSeg button").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-v") === S.tab); });
+  if (S.mode < 2 && (PATS[S.pat][1] > 1)) S.pat = "grid";
+  if (S.mode < 2 && (S.place === "enf")) S.place = "plate";
+  if (S.mode < 2 && S.style === "snug") S.style = "organic";
+  var v = VIEWS[S.tab];
+  stage.innerHTML = v.stage(); legend.innerHTML = v.legend(); rail.innerHTML = v.rail();
+  if (v.after) v.after();
+  card.innerHTML = '<p class="empty">Hover over ' + EMPTY[S.tab] + " to see what it is and why it matters.</p>";
+  tip.hidden = true; curEl = null; PIN = null;
+}
+drawMode(); render();
+
+/* ================= STELLA: offline guided assistant ================= */
+// Stella artwork shared with the other REEF trainers (same mascot across REEF tools).
+var STELLA_ART = `<path d="M79.2 53.3 L78.0 54.0 L76.7 54.6 L75.5 55.1 L74.3 55.6 L73.2 56.0 L72.1 56.3 L71.2 56.6 L70.3 56.9 L69.7 57.1 L69.1 57.4 L68.8 57.6 L68.6 58.0 L68.5 58.3 L68.4 58.6 L68.4 58.9 L68.3 59.2 L68.2 59.6 L68.1 59.9 L68.0 60.2 L67.9 60.5 L67.7 60.8 L67.6 61.1 L67.5 61.4 L67.4 61.7 L67.2 62.0 L67.1 62.3 L67.0 62.7 L67.1 63.1 L67.4 63.6 L67.7 64.3 L68.2 65.0 L68.7 65.8 L69.3 66.6 L69.9 67.6 L70.5 68.7 L71.1 69.8 L71.7 71.0 L72.2 72.4 L72.7 73.7 L73.0 75.2 L73.3 76.7 L73.4 78.2 L73.4 79.8 L73.2 81.4 L73.0 83.0 L72.5 84.6 L72.0 86.1 L71.3 87.5 L70.4 88.9 L69.5 90.2 L68.5 91.3 L67.5 92.4 L66.4 93.2 L65.4 93.9 L64.3 94.5 L63.3 94.9 L62.9 95.0 L62.5 94.9 L62.2 94.7 L62.0 94.4 L61.8 94.0 L61.6 93.5 L61.4 92.8 L61.2 92.1 L61.0 91.3 L60.7 90.4 L60.4 89.5 L60.1 88.5 L59.7 87.5 L59.3 86.4 L58.8 85.3 L58.3 84.2 L57.8 83.0 L57.2 81.9 L56.6 80.8 L56.0 79.7 L55.4 78.6 L54.9 77.6 L54.3 76.7 L53.8 75.8 L53.3 75.0 L52.8 74.3 L52.4 73.7 L52.0 73.3 L51.7 73.0 L51.3 73.0 L51.0 73.0 L50.7 73.0 L50.3 73.0 L50.0 73.0 L49.7 73.0 L49.3 73.0 L49.0 73.0 L48.7 73.0 L48.3 72.9 L48.0 72.9 L47.7 73.0 L47.3 73.2 L46.9 73.7 L46.4 74.3 L45.9 75.0 L45.4 75.9 L44.8 76.8 L44.2 77.9 L43.5 78.9 L42.8 80.1 L42.1 81.2 L41.4 82.4 L40.7 83.6 L40.0 84.7 L39.3 85.9 L38.6 87.0 L38.0 88.1 L37.4 89.2 L36.8 90.2 L36.3 91.1 L35.8 92.0 L35.3 92.7 L34.9 93.4 L34.4 94.0 L34.0 94.5 L33.6 94.9 L33.1 95.2 L32.7 95.3 L32.2 95.3 L31.7 95.1 L30.8 94.6 L29.8 94.0 L28.9 93.2 L28.0 92.2 L27.2 91.1 L26.4 89.9 L25.8 88.6 L25.2 87.2 L24.8 85.7 L24.4 84.2 L24.2 82.6 L24.2 81.0 L24.3 79.4 L24.5 77.8 L24.8 76.3 L25.2 74.7 L25.8 73.3 L26.4 71.9 L27.0 70.6 L27.8 69.3 L28.5 68.2 L29.2 67.1 L30.0 66.1 L30.6 65.2 L31.3 64.4 L31.8 63.7 L32.2 63.1 L32.5 62.5 L32.7 62.1 L32.6 61.7 L32.5 61.4 L32.4 61.1 L32.3 60.8 L32.1 60.5 L32.0 60.2 L31.9 59.9 L31.8 59.6 L31.7 59.2 L31.6 58.9 L31.6 58.6 L31.5 58.3 L31.4 58.0 L31.2 57.6 L30.9 57.4 L30.3 57.1 L29.7 56.9 L28.8 56.6 L27.9 56.3 L26.8 56.0 L25.7 55.6 L24.5 55.1 L23.3 54.6 L22.0 54.0 L20.8 53.3 L19.5 52.5 L18.3 51.6 L17.1 50.6 L16.0 49.5 L15.0 48.3 L14.0 47.0 L13.2 45.6 L12.5 44.2 L11.9 42.7 L11.5 41.2 L11.2 39.6 L11.1 38.1 L11.1 36.6 L11.2 35.2 L11.4 33.9 L11.7 32.7 L12.2 31.6 L12.7 30.7 L13.0 30.3 L13.3 30.1 L13.7 30.0 L14.2 30.0 L14.7 30.1 L15.2 30.4 L15.8 30.7 L16.5 31.1 L17.3 31.5 L18.1 32.0 L19.0 32.5 L20.0 33.0 L21.0 33.5 L22.1 34.1 L23.2 34.6 L24.4 35.2 L25.6 35.7 L26.8 36.3 L28.0 36.8 L29.1 37.3 L30.3 37.8 L31.4 38.3 L32.5 38.7 L33.5 39.1 L34.4 39.4 L35.2 39.7 L35.9 39.9 L36.5 40.0 L37.0 40.0 L37.3 39.9 L37.5 39.7 L37.8 39.4 L38.0 39.2 L38.3 39.0 L38.6 38.8 L38.8 38.6 L39.1 38.4 L39.4 38.2 L39.7 38.1 L39.9 37.9 L40.2 37.6 L40.3 37.2 L40.3 36.5 L40.3 35.7 L40.2 34.8 L40.2 33.8 L40.1 32.6 L40.0 31.3 L40.0 30.0 L40.0 28.6 L40.1 27.1 L40.2 25.6 L40.4 24.1 L40.7 22.5 L41.2 21.0 L41.7 19.5 L42.3 18.0 L43.1 16.6 L44.0 15.2 L44.9 14.0 L46.0 12.8 L47.1 11.8 L48.2 10.9 L49.4 10.1 L50.7 9.5 L51.9 9.0 L53.1 8.6 L54.3 8.4 L55.4 8.4 L56.4 8.4 L57.0 8.6 L57.4 8.8 L57.8 9.2 L58.1 9.7 L58.4 10.3 L58.6 11.0 L58.7 11.8 L58.8 12.6 L58.9 13.6 L58.9 14.7 L58.9 15.8 L58.9 17.0 L58.9 18.3 L58.9 19.6 L58.9 21.0 L58.8 22.4 L58.8 23.8 L58.8 25.2 L58.7 26.7 L58.7 28.1 L58.6 29.4 L58.6 30.8 L58.5 32.0 L58.5 33.1 L58.4 34.2 L58.4 35.1 L58.4 35.9 L58.5 36.5 L58.7 37.0 L58.9 37.2 L59.2 37.4 L59.5 37.5 L59.8 37.7 L60.1 37.9 L60.3 38.1 L60.6 38.2 L60.9 38.4 L61.2 38.6 L61.4 38.8 L61.7 39.0 L62.0 39.2 L62.2 39.4 L62.5 39.7 L62.7 39.9 L63.0 40.0 L63.5 40.0 L64.1 39.9 L64.8 39.7 L65.6 39.4 L66.5 39.1 L67.5 38.7 L68.6 38.3 L69.7 37.8 L70.9 37.3 L72.0 36.8 L73.2 36.3 L74.4 35.7 L75.6 35.2 L76.8 34.6 L77.9 34.1 L79.0 33.5 L80.0 33.0 L81.0 32.5 L81.9 32.0 L82.7 31.5 L83.5 31.1 L84.2 30.7 L84.8 30.4 L85.3 30.1 L85.8 30.0 L86.3 30.0 L86.7 30.1 L87.0 30.3 L87.3 30.7 L87.8 31.6 L88.3 32.7 L88.6 33.9 L88.8 35.2 L88.9 36.6 L88.9 38.1 L88.8 39.6 L88.5 41.2 L88.1 42.7 L87.5 44.2 L86.8 45.6 L86.0 47.0 L85.0 48.3 L84.0 49.5 L82.9 50.6 L81.7 51.6 L80.5 52.5 Z" fill="#F15B29" stroke="#F15B29" stroke-width="3" stroke-linejoin="round"/> <path d="M79.2 53.3 L78.0 54.0 L76.7 54.6 L75.5 55.1 L74.3 55.6 L73.2 56.0 L72.1 56.3 L71.2 56.6 L70.3 56.9 L69.7 57.1 L69.1 57.4 L68.8 57.6 L68.6 58.0 L68.5 58.3 L68.4 58.6 L68.4 58.9 L68.3 59.2 L68.2 59.6 L68.1 59.9 L68.0 60.2 L67.9 60.5 L67.7 60.8 L67.6 61.1 L67.5 61.4 L67.4 61.7 L67.2 62.0 L67.1 62.3 L67.0 62.7 L67.1 63.1 L67.4 63.6 L67.7 64.3 L68.2 65.0 L68.7 65.8 L69.3 66.6 L69.9 67.6 L70.5 68.7 L71.1 69.8 L71.7 71.0 L72.2 72.4 L72.7 73.7 L73.0 75.2 L73.3 76.7 L73.4 78.2 L73.4 79.8 L73.2 81.4 L73.0 83.0 L72.5 84.6 L72.0 86.1 L71.3 87.5 L70.4 88.9 L69.5 90.2 L68.5 91.3 L67.5 92.4 L66.4 93.2 L65.4 93.9 L64.3 94.5 L63.3 94.9 L62.9 95.0 L62.5 94.9 L62.2 94.7 L62.0 94.4 L61.8 94.0 L61.6 93.5 L61.4 92.8 L61.2 92.1 L61.0 91.3 L60.7 90.4 L60.4 89.5 L60.1 88.5 L59.7 87.5 L59.3 86.4 L58.8 85.3 L58.3 84.2 L57.8 83.0 L57.2 81.9 L56.6 80.8 L56.0 79.7 L55.4 78.6 L54.9 77.6 L54.3 76.7 L53.8 75.8 L53.3 75.0 L52.8 74.3 L52.4 73.7 L52.0 73.3 L51.7 73.0 L51.3 73.0 L51.0 73.0 L50.7 73.0 L50.3 73.0 L50.0 73.0 L49.7 73.0 L49.3 73.0 L49.0 73.0 L48.7 73.0 L48.3 72.9 L48.0 72.9 L47.7 73.0 L47.3 73.2 L46.9 73.7 L46.4 74.3 L45.9 75.0 L45.4 75.9 L44.8 76.8 L44.2 77.9 L43.5 78.9 L42.8 80.1 L42.1 81.2 L41.4 82.4 L40.7 83.6 L40.0 84.7 L39.3 85.9 L38.6 87.0 L38.0 88.1 L37.4 89.2 L36.8 90.2 L36.3 91.1 L35.8 92.0 L35.3 92.7 L34.9 93.4 L34.4 94.0 L34.0 94.5 L33.6 94.9 L33.1 95.2 L32.7 95.3 L32.2 95.3 L31.7 95.1 L30.8 94.6 L29.8 94.0 L28.9 93.2 L28.0 92.2 L27.2 91.1 L26.4 89.9 L25.8 88.6 L25.2 87.2 L24.8 85.7 L24.4 84.2 L24.2 82.6 L24.2 81.0 L24.3 79.4 L24.5 77.8 L24.8 76.3 L25.2 74.7 L25.8 73.3 L26.4 71.9 L27.0 70.6 L27.8 69.3 L28.5 68.2 L29.2 67.1 L30.0 66.1 L30.6 65.2 L31.3 64.4 L31.8 63.7 L32.2 63.1 L32.5 62.5 L32.7 62.1 L32.6 61.7 L32.5 61.4 L32.4 61.1 L32.3 60.8 L32.1 60.5 L32.0 60.2 L31.9 59.9 L31.8 59.6 L31.7 59.2 L31.6 58.9 L31.6 58.6 L31.5 58.3 L31.4 58.0 L31.2 57.6 L30.9 57.4 L30.3 57.1 L29.7 56.9 L28.8 56.6 L27.9 56.3 L26.8 56.0 L25.7 55.6 L24.5 55.1 L23.3 54.6 L22.0 54.0 L20.8 53.3 L19.5 52.5 L18.3 51.6 L17.1 50.6 L16.0 49.5 L15.0 48.3 L14.0 47.0 L13.2 45.6 L12.5 44.2 L11.9 42.7 L11.5 41.2 L11.2 39.6 L11.1 38.1 L11.1 36.6 L11.2 35.2 L11.4 33.9 L11.7 32.7 L12.2 31.6 L12.7 30.7 L13.0 30.3 L13.3 30.1 L13.7 30.0 L14.2 30.0 L14.7 30.1 L15.2 30.4 L15.8 30.7 L16.5 31.1 L17.3 31.5 L18.1 32.0 L19.0 32.5 L20.0 33.0 L21.0 33.5 L22.1 34.1 L23.2 34.6 L24.4 35.2 L25.6 35.7 L26.8 36.3 L28.0 36.8 L29.1 37.3 L30.3 37.8 L31.4 38.3 L32.5 38.7 L33.5 39.1 L34.4 39.4 L35.2 39.7 L35.9 39.9 L36.5 40.0 L37.0 40.0 L37.3 39.9 L37.5 39.7 L37.8 39.4 L38.0 39.2 L38.3 39.0 L38.6 38.8 L38.8 38.6 L39.1 38.4 L39.4 38.2 L39.7 38.1 L39.9 37.9 L40.2 37.6 L40.3 37.2 L40.3 36.5 L40.3 35.7 L40.2 34.8 L40.2 33.8 L40.1 32.6 L40.0 31.3 L40.0 30.0 L40.0 28.6 L40.1 27.1 L40.2 25.6 L40.4 24.1 L40.7 22.5 L41.2 21.0 L41.7 19.5 L42.3 18.0 L43.1 16.6 L44.0 15.2 L44.9 14.0 L46.0 12.8 L47.1 11.8 L48.2 10.9 L49.4 10.1 L50.7 9.5 L51.9 9.0 L53.1 8.6 L54.3 8.4 L55.4 8.4 L56.4 8.4 L57.0 8.6 L57.4 8.8 L57.8 9.2 L58.1 9.7 L58.4 10.3 L58.6 11.0 L58.7 11.8 L58.8 12.6 L58.9 13.6 L58.9 14.7 L58.9 15.8 L58.9 17.0 L58.9 18.3 L58.9 19.6 L58.9 21.0 L58.8 22.4 L58.8 23.8 L58.8 25.2 L58.7 26.7 L58.7 28.1 L58.6 29.4 L58.6 30.8 L58.5 32.0 L58.5 33.1 L58.4 34.2 L58.4 35.1 L58.4 35.9 L58.5 36.5 L58.7 37.0 L58.9 37.2 L59.2 37.4 L59.5 37.5 L59.8 37.7 L60.1 37.9 L60.3 38.1 L60.6 38.2 L60.9 38.4 L61.2 38.6 L61.4 38.8 L61.7 39.0 L62.0 39.2 L62.2 39.4 L62.5 39.7 L62.7 39.9 L63.0 40.0 L63.5 40.0 L64.1 39.9 L64.8 39.7 L65.6 39.4 L66.5 39.1 L67.5 38.7 L68.6 38.3 L69.7 37.8 L70.9 37.3 L72.0 36.8 L73.2 36.3 L74.4 35.7 L75.6 35.2 L76.8 34.6 L77.9 34.1 L79.0 33.5 L80.0 33.0 L81.0 32.5 L81.9 32.0 L82.7 31.5 L83.5 31.1 L84.2 30.7 L84.8 30.4 L85.3 30.1 L85.8 30.0 L86.3 30.0 L86.7 30.1 L87.0 30.3 L87.3 30.7 L87.8 31.6 L88.3 32.7 L88.6 33.9 L88.8 35.2 L88.9 36.6 L88.9 38.1 L88.8 39.6 L88.5 41.2 L88.1 42.7 L87.5 44.2 L86.8 45.6 L86.0 47.0 L85.0 48.3 L84.0 49.5 L82.9 50.6 L81.7 51.6 L80.5 52.5 Z" fill="none" stroke="#B71F34" stroke-width="1.6" stroke-linejoin="round" opacity=".45"/> <g fill="#FCC424" opacity=".8"><circle cx="49.6" cy="25.6" r="2.3"/><circle cx="50.6" cy="20.2" r="2.0"/><circle cx="52.1" cy="15.6" r="1.7"/><circle cx="54.0" cy="12.0" r="1.5"/><circle cx="76.1" cy="44.6" r="2.3"/><circle cx="80.3" cy="41.6" r="2.0"/><circle cx="83.5" cy="38.2" r="1.7"/><circle cx="85.6" cy="34.8" r="1.5"/><circle cx="64.5" cy="77.2" r="2.3"/><circle cx="65.7" cy="82.1" r="2.0"/><circle cx="65.7" cy="86.7" r="1.7"/><circle cx="65.0" cy="90.7" r="1.5"/><circle cx="34.1" cy="77.1" r="2.3"/><circle cx="32.2" cy="82.1" r="2.0"/><circle cx="31.3" cy="86.7" r="1.7"/><circle cx="31.1" cy="90.8" r="1.5"/><circle cx="23.9" cy="44.6" r="2.3"/><circle cx="19.7" cy="41.6" r="2.0"/><circle cx="16.5" cy="38.2" r="1.7"/><circle cx="14.4" cy="34.8" r="1.5"/></g> <ellipse cx="41" cy="50" rx="5" ry="6.2" fill="#010101"/><ellipse cx="59" cy="50" rx="5" ry="6.2" fill="#010101"/> <circle cx="42.8" cy="47.6" r="2" fill="#fff"/><circle cx="60.8" cy="47.6" r="2" fill="#fff"/> <circle cx="39.6" cy="52.6" r=".9" fill="#fff"/><circle cx="57.6" cy="52.6" r=".9" fill="#fff"/> <ellipse cx="33.5" cy="59" rx="4.2" ry="2.8" fill="#B71F34" opacity=".5"/><ellipse cx="66.5" cy="59" rx="4.2" ry="2.8" fill="#B71F34" opacity=".5"/> <defs><clipPath id="eyeClip"><ellipse cx="41" cy="50" rx="5.8" ry="7"/><ellipse cx="59" cy="50" rx="5.8" ry="7"/></clipPath></defs> <g clip-path="url(#eyeClip)"> <g class="lid"><rect x="34" y="42" width="14" height="9" fill="#F15B29"/><path d="M34.5 51 Q41 53 47.5 51" fill="none" stroke="#010101" stroke-width="1.8" stroke-linecap="round"/></g> <g class="lid"><rect x="52" y="42" width="14" height="9" fill="#F15B29"/><path d="M52.5 51 Q59 53 65.5 51" fill="none" stroke="#010101" stroke-width="1.8" stroke-linecap="round"/></g> </g> <g class="smile"> <path d="M45 58 Q50 65 55 58 Z" fill="#B71F34" stroke="#010101" stroke-width="2.2" stroke-linejoin="round"/> <path d="M47.6 61.2 Q50 63.6 52.4 61.2" fill="none" stroke="#F15B29" stroke-width="2" stroke-linecap="round"/> </g> <ellipse class="yawn" cx="50" cy="62" rx="3.6" ry="4.6" fill="#B71F34" stroke="#010101" stroke-width="2.2"/>`, starN = 0;
+function starSVG(sz, cls, id) {
+  starN++;
+  return '<svg class="star ' + (cls || "") + '"' + (id ? ' id="' + id + '"' : "") + ' viewBox="0 0 100 100" width="' + sz + '" height="' + sz + '" aria-hidden="true">' + STELLA_ART.replace(/eyeClip/g, "eyeClip" + starN) + "</svg>";
+}
+var st = document.createElement("div"); st.id = "stella";
+st.innerHTML = '<div class="hello" id="sHello" hidden>Hi! I’m Stella. Want help getting started with PrusaSlicer?<div class="row"><button type="button" id="sYes">Yes please</button><button type="button" id="sNo">No thanks</button></div></div>' +
+  '<div class="spanel" id="sPanel" role="dialog" aria-label="Stella, your 3D printing guide" hidden><div class="shead">' + starSVG(30, "mini") + '<b>Stella</b><span>your 3D printing guide</span><button type="button" class="sreset" id="sReset" title="Start the chat over">↺ Reset</button><button type="button" id="sClose" aria-label="Close">×</button></div>' +
+  '<div class="msgs" id="sMsgs" aria-live="polite"></div><div class="opts" id="sOpts"></div></div>' +
+  '<button type="button" class="stella-btn" id="sBtn" aria-label="Open Stella, the 3D printing guide" aria-expanded="false"><span class="zzz" aria-hidden="true"><i></i><i></i><i></i><b>z</b><b>z</b></span>' + starSVG(84, "idle", "sStar") + "</button>";
+document.body.appendChild(st);
+var sMsgs = $("sMsgs"), sOpts = $("sOpts"), sPanel = $("sPanel"), CH = [];
+function say(html) { var d = document.createElement("div"); d.className = "msg s"; d.innerHTML = html; sMsgs.appendChild(d); while (sMsgs.children.length > 40) sMsgs.removeChild(sMsgs.firstChild); sMsgs.scrollTop = sMsgs.scrollHeight; }
+function you(t) { var d = document.createElement("div"); d.className = "msg u"; d.textContent = t; sMsgs.appendChild(d); sMsgs.scrollTop = sMsgs.scrollHeight; }
+function choices(list) { CH = list.filter(Boolean); sOpts.innerHTML = CH.map(function (o, i) { return '<button type="button" class="chip' + (o[2] ? " go" : "") + '" data-i="' + i + '">' + o[0] + "</button>"; }).join(""); }
+sOpts.addEventListener("click", function (e) { var b = e.target.closest("[data-i]"); if (!b) return; var o = CH[+b.getAttribute("data-i")]; var tmp = document.createElement("div"); tmp.innerHTML = o[0]; you(tmp.textContent); o[1](); });
+function openPanel(o) { if (o && sPanel.hidden) wiggle(); sPanel.hidden = !o; $("sHello").hidden = true; $("sBtn").setAttribute("aria-expanded", o); LS.set("reefps.stella", "seen"); if (o && !sMsgs.children.length) home(); }
+$("sBtn").onclick = function () { openPanel(sPanel.hidden); };
+$("sClose").onclick = function () { openPanel(false); clearSpot(); };
+$("sReset").onclick = function () { resetChat(); };
+$("sYes").onclick = function () { openPanel(true); };
+$("sNo").onclick = function () { $("sHello").hidden = true; LS.set("reefps.stella", "seen"); };
+if (LS.get("reefps.stella") !== "seen") setTimeout(function () { if (sPanel.hidden) { $("sHello").hidden = false; wiggle(); } }, 1200);
+var mascot = $("sStar"), boredT = 0;
+function wiggle() { unbore(); mascot.classList.remove("idle", "wiggle"); void mascot.getBoundingClientRect(); mascot.classList.add("wiggle"); setTimeout(function () { mascot.classList.remove("wiggle"); mascot.classList.add("idle"); }, 1850); }
+function jump() { unbore(); mascot.classList.remove("idle", "wiggle", "jump"); void mascot.getBoundingClientRect(); mascot.classList.add("jump"); setTimeout(function () { mascot.classList.remove("jump"); mascot.classList.add("idle"); }, 1050); }
+function bore() { if (!sPanel.hidden || mascot.classList.contains("jump")) { poke(); return; } mascot.classList.remove("idle", "wiggle"); mascot.classList.add("bored"); st.classList.add("bored"); }
+function unbore() { if (!mascot.classList.contains("bored")) return; mascot.classList.remove("bored"); st.classList.remove("bored"); mascot.classList.add("idle"); }
+function poke() { unbore(); clearTimeout(boredT); boredT = setTimeout(bore, 45000); }
+["pointerdown", "keydown"].forEach(function (ev) { document.addEventListener(ev, poke, true); });
+poke();
+document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !sPanel.hidden) openPanel(false); });
+
+function setMode(m) { S.mode = m; LS.set("reefps.mode", m); drawMode(); render(); }
+var ring = document.createElement("div"); ring.className = "spot-ring"; ring.hidden = true;
+ring.innerHTML = '<span class="spot-tag">Here!</span>'; document.body.appendChild(ring);
+var spotEl = null, spotUntil = 0, spotRaf = 0;
+function placeRing() {
+  if (!spotEl || !document.body.contains(spotEl) || Date.now() > spotUntil) { clearSpot(); return; }
+  var r = spotEl.getBoundingClientRect(), pad = 6;
+  ring.style.left = (r.left - pad) + "px"; ring.style.top = (r.top - pad) + "px";
+  ring.style.width = (r.width + pad * 2) + "px"; ring.style.height = (r.height + pad * 2) + "px";
+  ring.classList.toggle("below", r.top < 40);
+  dodge(r);
+  spotRaf = requestAnimationFrame(placeRing);
+}
+function dodge(r) {
+  if (sPanel.hidden) return;
+  sPanel.classList.remove("dockL");
+  var p = sPanel.getBoundingClientRect();
+  if (!(r.right < p.left || r.left > p.right || r.bottom < p.top || r.top > p.bottom)) sPanel.classList.add("dockL");
+}
+function clearSpot() { cancelAnimationFrame(spotRaf); ring.hidden = true; spotEl = null; sPanel.classList.remove("dockL"); document.querySelectorAll(".pulse").forEach(function (n) { n.classList.remove("pulse"); }); }
+function spot(sel) {
+  clearSpot();
+  var el = document.querySelector(sel); if (!el) return;
+  el.classList.add("pulse"); spotEl = el; spotUntil = Date.now() + 9000;
+  var r = el.getBoundingClientRect(); if (r.top < 70 || r.bottom > window.innerHeight - 20) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  ring.hidden = false; placeRing();
+}
+document.addEventListener("pointerdown", function (e) { if (spotEl && !e.target.closest("#stella")) clearSpot(); }, true);
+function resetChat() { clearSpot(); Q = null; sMsgs.innerHTML = ""; home(); }
+function go(tab, set, sel) { if (set) set(); S.tab = tab; LS.set("reefps.tab", tab); render(); if (sel) setTimeout(function () { spot(sel); }, 60); }
+var BACK = ["Back to start", function () { home(); }];
+
+function home() {
+  say("Hi, I’m Stella! I can help you slice a part that prints the first time. What sounds right?");
+  choices([["I’m new to PrusaSlicer", newbie, 1], ["Check my part", partQ], ["Give me the guided tour", function () { tour(0); }], ["Help with this page", tabHelp], ["Quiz me", quizStart], ["Pick my level", levelQ]]);
+}
+function newbie() {
+  say("Welcome! Here’s a good path:<ol><li>Learn the PrusaSlicer window</li><li>Check your part’s <b>bed contact</b> — the #1 cause of failed prints and clogs</li><li>Infill, brim and supports</li><li>Slice, check, and export</li></ol>" + (S.mode > 1 ? "I switched you to <b>Beginner mode</b> to keep it simple. " : "") + "Change level any time with the mode button at the top.");
+  if (S.mode > 1) setMode(1);
+  choices([["Start the tour", function () { tour(0); }, 1], ["Show me bed contact", function () { go("orient", function () { S.part = "tower"; S.ori = 0; S.brim = false; }, '#stage [data-info="or_contact"]'); say("See the red strip? That’s all that touches the bed. Try the other orientations, or tick <b>Add a brim</b>."); choices([["Next: infill", function () { tour(4); }, 1], BACK]); }], BACK]);
+}
+function levelQ() {
+  say("Have you used PrusaSlicer before?");
+  var done = function (m, t) { return function () { setMode(m); say(t); choices([["Take the guided tour", function () { tour(0); }, 1], BACK]); }; };
+  choices([["Never", done(1, "<b>Beginner mode</b>: the essentials, like PrusaSlicer’s Beginner mode.")],
+    ["A few prints", done(2, "<b>Intermediate mode</b>: more settings and terms, like PrusaSlicer’s Normal mode.")],
+    ["I know it well", done(3, "<b>Expert mode</b>: everything, including the reasons behind each setting.")]]);
+}
+/* --- part checker --- */
+var PQ = {};
+function partQ() {
+  PQ = {}; say("Let’s check your part. Look at it in PrusaSlicer. How does it sit on the bed?");
+  choices([["Big flat face on the bed", function () { PQ.base = "flat"; pq2(); }], ["Small or narrow base, and it’s tall", function () { PQ.base = "tall"; pq2(); }], ["Round, pointy, or balanced on an edge", function () { PQ.base = "bad"; pq2(); }], BACK]);
+}
+function pq2() {
+  say("Does anything hang out in the air — like an arm, a ledge, or a roof — with nothing under it?");
+  choices([["No", function () { PQ.over = 0; pq3(); }], ["Yes, but less than 45° from vertical", function () { PQ.over = 0; pq3(); }], ["Yes, sticks straight out", function () { PQ.over = 1; pq3(); }]]);
+}
+function pq3() {
+  var out = [];
+  if (PQ.base === "bad") out.push("<b>Re-orient first.</b> Use <b>Place on face</b> <kbd>F</kbd> to put a flat face down. No flat face? Use <b>Cut</b> <kbd>C</kbd> to make one, or split the part.");
+  if (PQ.base === "tall") out.push("<b>Add a brim</b>, or lay it down if it still looks right that way.");
+  if (PQ.base === "flat") out.push("Bed contact looks <b>good</b>. ✓");
+  out.push(PQ.over ? "<b>Supports: on build plate only</b> — but first check whether rotating removes the overhang." : "<b>Supports: None.</b> ✓");
+  out.push("<b>Infill:</b> 15% (more walls, not more infill, if it needs to be strong).");
+  say("<p><b>My suggestion</b></p><ul>" + out.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul><p>Then slice, and check layer 1 in Preview.</p>");
+  if (PQ.base === "flat" && !PQ.over) jump();
+  choices([PQ.base !== "flat" ? ["Show me bed contact", function () { go("orient", function () { S.part = PQ.base === "bad" ? "ball" : "tower"; S.ori = 0; S.brim = false; }, '#rail .verdict'); say("Try the orientations here and watch the verdict change."); choices([BACK]); }, 1] : null,
+    PQ.over ? ["Show me supports", function () { go("sup", function () { S.place = "plate"; }, '#rail [data-set="place"]'); say("Compare <b>Build plate only</b> with <b>None</b> and <b>Everywhere</b>."); choices([BACK]); }, PQ.base === "flat"] : null,
+    ["Show the export checklist", function () { go("export", null, "#rail .checks"); say("Tick these off before you export."); choices([BACK]); }], ["Check another part", partQ]]);
+}
+/* --- page help --- */
+var TIPS = {
+  ui: [["Start here: set the three presets. Hover each one.", '#stage [data-info="ui_printer"]'], ["The <b>Place on face</b> tool (F) is the most useful tool in PrusaSlicer.", '#stage [data-info="ui_gz"]'], ["Switch to <b>Preview</b> to see the sliced layers.", '#rail [data-set="pv"]']],
+  orient: [["Try each orientation — watch the red contact patch and the verdict.", '#rail [data-set="ori"]'], ["The footprint view shows the first layer from underneath.", '#stage [data-info="or_top"]'], ["Tick <b>Add a brim</b> to see how much it helps — and when it can’t.", "#rail .chk"]],
+  infill: [["Drag the density slider and watch time and filament change.", '#rail input[data-set="dens"]'], ["Not sure what to pick? Use this table.", "#rail table"]],
+  brim: [["Answer these three questions to decide on a brim.", "#rail section:first-child"], ["Try the different shapes to see how a brim spreads the grip.", '#rail [data-set="bshape"]']],
+  sup: [["Switch between support placements here.", '#rail [data-set="place"]'], ["Drag the slope past 45° and watch it start to need support.", '#rail input[data-set="ang"]']],
+  printer: [["Press <b>Play</b> to watch a whole print, from heating to finished.", "#anPlay"], ["Pick a step — Before, Start, Watch, After — and follow the checklist.", '#rail [data-set="phase"]'], ["These are the REEF 3D printing rules.", "#rail section:nth-child(2)"]],
+  "export": [["Hover each step to see the full workflow.", '#stage [data-info="wf_0"]'], ["Tick this checklist before every print.", "#rail .checks"]]
+};
+function tabHelp(n) {
+  n = typeof n === "number" ? n : 0; var t = TIPS[S.tab], tp = t[n % t.length];
+  say(tp[0]); setTimeout(function () { spot(tp[1]); }, 60);
+  choices([["Another tip", function () { tabHelp(n + 1); }, 1], BACK]);
+}
+/* --- guided tour --- */
+var TOUR = [
+  ["ui", "#modeBtn", "This button sets your level, just like PrusaSlicer’s Beginner / Normal / Expert switch.", function () { S.pv = false; }],
+  ["ui", '#stage [data-info="ui_printer"]', "First, pick the <b>MK4S</b> printer, <b>PLA</b> filament and <b>0.20mm STRUCTURAL</b>. Hover anything in the window to learn about it.", function () { S.pv = false; }],
+  ["orient", '#stage [data-info="or_contact"]', "This red strip is the only thing holding the print down. Too small → the part breaks loose → spaghetti and clogs.", function () { S.part = "tower"; S.ori = 0; S.brim = false; }],
+  ["orient", '#rail [data-set="ori"]', "Try another orientation. Low and wide beats tall and skinny."],
+  ["infill", '#rail input[data-set="dens"]', "Infill is the pattern inside. 15% suits most prints."],
+  ["brim", '#rail section:first-child', "A brim spreads the grip over a bigger area. These questions tell you when to use one."],
+  ["sup", '#rail [data-set="place"]', "Supports hold up overhangs. <b>Build plate only</b> is the REEF go-to.", function () { S.place = "plate"; }],
+  ["export", "#rail .checks", "Then: slice, check layer 1 in Preview, and export to the USB drive."],
+  ["printer", '#rail [data-set="phase"]', "At the printer: clean sheet, start from the USB drive, <b>watch the first 5 minutes</b>, and label your print. The REEF policy is here too.", function () { S.phase = "before"; }]
+];
+function tour(i) {
+  var t = TOUR[i]; go(t[0], t[3], t[1]);
+  say("<b>Step " + (i + 1) + " of " + TOUR.length + "</b><br>" + t[2]);
+  choices([i < TOUR.length - 1 ? ["Next →", function () { tour(i + 1); }, 1] : ["Finish", function () { jump(); say("You’re all set! Click me any time you want a hand."); choices([["Quiz me", quizStart, 1], BACK]); }, 1],
+    i > 0 ? ["← Back", function () { tour(i - 1); }] : null, ["End tour", home]]);
+}
+/* --- quiz --- */
+var QUIZ = [
+  ["Which printer preset should you pick at REEF?", ["Original Prusa MK4S", "Original Prusa MK4", "Original Prusa MINI"], "Every REEF printer is an MK4S, and it checks the file was sliced for it.", 1, ["ui", null, '#stage [data-info="ui_printer"]']],
+  ["What holds a print to the bed?", ["Only the first layer — the part touching the bed", "The supports", "The infill"], "That’s why contact area matters so much.", 1, ["orient", null, '#stage [data-info="or_contact"]']],
+  ["Why does a part breaking loose cause clogs?", ["The printer keeps extruding, and plastic piles up around the nozzle", "It makes the bed too hot", "It changes the filament"], "Spaghetti turns into a blob around the hotend.", 1, ["orient", null, "#rail .verdict"]],
+  ["Which tool puts a flat face on the bed?", ["Place on face (F)", "Scale (S)", "Seam painting (P)"], "Click it, then click the face you want down.", 1, ["ui", null, '#stage [data-info="ui_gz"]']],
+  ["A ball touches the bed at almost a single point. Best fix?", ["Cut a flat bottom, or cut it in half", "Add a brim", "Use 100% infill"], "A brim can’t grip a part that barely touches the bed.", 1, ["orient", function () { S.part = "ball"; S.ori = 1; }, '#rail [data-set="ori"]']],
+  ["What infill is right for most REEF prints?", ["About 15%", "100%", "0%"], "More walls add strength better than more infill.", 1, ["infill", function () { S.dens = 15; }, '#rail input[data-set="dens"]']],
+  ["When should you use a brim?", ["Small footprint, tall/thin parts, or sharp corners", "On every print", "Only with supports"], "It spreads the grip over a bigger area.", 1, ["brim", null, "#rail section:first-child"]],
+  ["Up to roughly what angle can PLA overhang without support?", ["45° from vertical", "80° from vertical", "Any angle"], "Past that the layers droop and curl.", 1, ["sup", function () { S.ang = 50; }, '#rail input[data-set="ang"]']],
+  ["Which support placement is REEF’s go-to?", ["Support on build plate only", "Everywhere", "None, ever"], "Supports that start on the bed come off cleanly.", 1, ["sup", function () { S.place = "plate"; }, '#rail [data-set="place"]']],
+  ["What’s the file type for the MK4S?", [".bgcode (binary G-code)", ".stl", ".3mf"], "STL and 3MF are models; the printer needs the sliced G-code.", 2, ["export", null, '#stage [data-info="wf_7"]']],
+  ["To make a part stronger, the best first step is…", ["More walls (perimeters)", "100% infill", "Lightning infill"], "Strength lives at the surface.", 2, ["infill", function () { S.walls = 4; }, '#rail [data-set="walls"]']],
+  ["What’s the time cap on a single print job at REEF?", ["20 hours", "8 hours", "No limit"], "Long prints should be checked on, too.", 1, ["printer", function () { S.phase = "watch"; }, "#rail section:nth-child(2)"]],
+  ["How long must you watch your print before leaving?", ["The first 5 minutes of printing", "Just until it heats up", "The whole print"], "Most failures happen on the first layer.", 1, ["printer", function () { S.phase = "watch"; }, '#stage [data-info="pr_purge"]']],
+  ["The print isn’t sticking. What should you do to the bed?", ["Wash it with dish soap and water, dry both sides", "Add glue stick", "Scrape it with a tool"], "Glue and tools ruin the sheets.", 1, ["printer", function () { S.phase = "before"; }, '#stage [data-info="pr_sheet"]']],
+  ["No plastic comes out during the purge line. What do you do?", ["Pause the print and tell staff", "Fix the nozzle yourself", "Change the filament"], "Only staff do maintenance.", 1, ["printer", function () { S.phase = "watch"; }, '#stage [data-info="pr_knob"]']],
+  ["Your print failed and you don’t know why. Next step?", ["Talk to staff before printing again", "Print it again right away", "Try another printer"], "Staff can help find the cause.", 1, ["printer", function () { S.phase = "after"; }, "#rail section:nth-child(2)"]],
+  ["PrusaSlicer warns “Low bed adhesion”. Quick fix?", ["Tick Brim and slice again", "Use 100% infill", "Ignore it"], "Or re-orient for a bigger footprint.", 2, ["brim", null, "#rail section:first-child"]],
+  ["Which support style uses tree-like branches?", ["Organic", "Grid", "Snug"], "Organic supports use less plastic and pop off easily.", 2, ["sup", function () { S.style = "organic"; }, '#rail [data-set="style"]']],
+  ["What does “Everywhere” add compared with build plate only?", ["Supports that stand on the model itself", "Thicker supports", "A brim"], "Needed for overhangs above other parts of the model — but they leave marks.", 3, ["sup", function () { S.place = "every"; }, '#stage [data-info="su_cap"]']]
+];
+var Q = null;
+function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+function quizStart() { Q = { list: shuffle(QUIZ.filter(function (q) { return q[3] <= S.mode; })).slice(0, 5), i: 0, score: 0 }; say("Quick quiz — " + Q.list.length + " questions at your level. Ready?"); ask(); }
+function ask() {
+  if (Q.i >= Q.list.length) { say("You got <b>" + Q.score + " of " + Q.list.length + "</b>. " + (Q.score === Q.list.length ? "Perfect!" : "Nice work — try again for different questions.")); if (Q.score === Q.list.length) jump(); choices([["Quiz me again", quizStart, 1], BACK]); return; }
+  var q = Q.list[Q.i], ans = shuffle(q[1].map(function (t, i) { return { t: t, ok: i === 0 }; }));
+  say("<b>Q" + (Q.i + 1) + ".</b> " + q[0]);
+  choices(ans.map(function (a) { return [a.t, function () {
+    if (a.ok) { Q.score++; jump(); say("Correct! " + q[2]); } else say("Not quite — it’s <b>" + q[1][0] + "</b>. " + q[2]);
+    Q.i++;
+    choices([["Next question", ask, 1], ["Show me", function () { go(q[4][0], q[4][1], q[4][2]); say("There it is — look for the yellow ring on the page."); choices([["Next question", ask, 1], ["Stop quiz", home]]); }], ["Stop quiz", home]]);
+  }]; }));
+}
+
+/* ================= STAFF PHOTO MODE ================= */
+var sb = $("staffBar");
+function drawStaff() {
+  sb.hidden = !STAFF; if (!STAFF) return;
+  var keys = Object.keys(PHOTO_KEYS), have = keys.filter(function (k) { return PHOTOS[k]; }).length;
+  sb.innerHTML = '<div class="in"><b>Staff photo mode</b><span>' + have + " of " + keys.length + " suggested images added. Pick an item, then use <b>Add image</b> in the Info panel. When done, save the new file.</span>" +
+    '<div class="chips">' + keys.map(function (k) { return '<button type="button" class="chip" data-pk="' + k + '">' + (PHOTOS[k] ? "✓ " : "") + I[k].t + "</button>"; }).join("") + "</div>" +
+    '<button type="button" class="btn pri" id="saveHtml">Save HTML with images</button><button type="button" class="btn sec" id="exitStaff">Exit staff mode</button></div>';
+}
+function jumpTo(k) {
+  var pre = k.split("_")[0], tab = { ui: "ui", pv: "ui", pr: "printer", or: "orient", pat: "infill", in: "infill", br: "brim", su: "sup" }[pre] || "ui";
+  go(tab, function () { if (pre === "pv") S.pv = true; if (pre === "ui") S.pv = k === "ui_export"; if (pre === "pat") S.pat = k === "pat_gyroid" ? "gyroid" : S.pat; if (pre === "su") S.place = "plate"; });
+  var el = document.querySelector('#stage [data-info="' + k + '"]') || document.querySelector('[data-info="' + k + '"]');
+  if (el) { showCard(el, true); el.scrollIntoView({ block: "center", behavior: "smooth" }); } else cardKey(k);
+}
+function readPhoto(file, cb) {
+  var fr = new FileReader();
+  fr.onload = function () { var im = new Image(); im.onload = function () {
+    var s = Math.min(1, 1400 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
+    cv.width = Math.round(im.width * s); cv.height = Math.round(im.height * s); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
+    cb(cv.toDataURL("image/jpeg", 0.85)); }; im.src = fr.result; };
+  fr.readAsDataURL(file);
+}
+function saveHTML() {
+  var tag = '<script type="application/json" id="photoData">', i0 = INITIAL.indexOf(tag), i1 = INITIAL.indexOf("</" + "script>", i0);
+  if (i0 < 0 || i1 < 0) { alert("Couldn’t find the image block in this file."); return; }
+  var out = "<!doctype html>\n" + INITIAL.slice(0, i0 + tag.length) + JSON.stringify(PHOTOS).replace(/</g, "\\u003c") + INITIAL.slice(i1);
+  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([out], { type: "text/html" })); a.download = "reef-prusaslicer-trainer.html";
+  document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+sb.addEventListener("click", function (e) {
+  var c = e.target.closest("[data-pk]"); if (c) { jumpTo(c.getAttribute("data-pk")); return; }
+  if (e.target.id === "saveHtml") saveHTML();
+  if (e.target.id === "exitStaff") { STAFF = false; drawStaff(); }
+});
+card.addEventListener("change", function (e) {
+  var t = e.target; if (!t.hasAttribute("data-photo") || !t.files[0]) return;
+  var key = t.getAttribute("data-photo");
+  readPhoto(t.files[0], function (url) { PHOTOS[key] = url; cardKey(key); drawStaff(); });
+});
+card.addEventListener("click", function (e) { var b = e.target.closest("[data-unphoto]"); if (!b) return; var key = b.getAttribute("data-unphoto"); delete PHOTOS[key]; cardKey(key); drawStaff(); });
+document.addEventListener("keydown", function (e) { if (e.ctrlKey && e.altKey && e.shiftKey && (e.key === "P" || e.key === "p")) { STAFF = !STAFF; drawStaff(); } });
+drawStaff();
+
+})();
+</script>
+</body></html>
